@@ -1,10 +1,21 @@
 {
   "compilerOptions": {
     "strict": true,
-    "outDir": "./dist/",
-    "sourceMap": true,
     "target": "ES2022",
-    "lib":["ES2022", "DOM"],
-    "moduleResolution": "Node"
-  }
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM"],
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.vue",
+    "__test__/**/*.ts",
+    "vite.config.mts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }

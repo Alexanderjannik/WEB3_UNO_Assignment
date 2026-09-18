@@ -1,5 +1,7 @@
 import { Card, cardPoints } from './deck'
 
+//#region Hand interface
+
 export interface Hand {
   readonly cards: readonly Card[]
   readonly size: number
@@ -8,6 +10,10 @@ export interface Hand {
   score(): number
   toMemento(): Card[]
 }
+
+//#endregion
+
+//#region Player Hand implementation
 
 export class PlayerHand implements Hand {
   private heldCards: Card[]
@@ -48,3 +54,5 @@ export class PlayerHand implements Hand {
     return this.heldCards.map(card => ({ ...card })) 
   }
 }
+
+//#endregion

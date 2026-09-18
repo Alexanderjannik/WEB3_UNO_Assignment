@@ -4,8 +4,11 @@
   "description": "Uno",
   "main": "index.js",
   "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
     "test": "jest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "vue-tsc --noEmit"
   },
   "keywords": [
     "uno",
@@ -21,6 +24,12 @@
     "babel-jest": "^29.7.0",
     "jest": "^29.7.0",
     "ts-loader": "^9.5.1",
-    "typescript": "^5.4.5"
+    "vue": "^3.5.43"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.9",
+    "typescript": "~5.9.3",
+    "vite": "^8.3.0",
+    "vue-tsc": "^3.3.11"
   }
 }

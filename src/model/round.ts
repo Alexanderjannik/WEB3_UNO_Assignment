@@ -2,6 +2,8 @@ import { Card, CardDeck, Color, Deck, colors, hasColor } from './deck'
 import { PlayerHand } from './hand'
 import { Shuffler, standardShuffler } from '../utils/random_utils'
 
+//#region Types
+
 export type RoundMemento = {
   players: string[]
   hands: Card[][]
@@ -25,6 +27,10 @@ export type RoundConfig = {
 
 export type RoundEnd = { winner: number }
 
+//#endregion
+
+//#region Round interface
+
 export interface Round {
   readonly playerCount: number
   readonly dealer: number
@@ -47,7 +53,13 @@ export interface Round {
   toMemento(): RoundMemento
 }
 
+//#endregion
+
+//#region Round implementation
+
 export class UnoRound implements Round {
+  //#region Fields and constructor
+
   private players: string[]
   private hands: PlayerHand[]
   private drawCards: CardDeck
@@ -169,6 +181,10 @@ export class UnoRound implements Round {
   }
 }
 
+  //#endregion
+
+  //#region Round creation
+
   static create({players, dealer, shuffler = standardShuffler, cardsPerPlayer = 7}: RoundConfig): UnoRound
 {
   if (players.length < 2 || players.length > 10)
@@ -258,6 +274,10 @@ export class UnoRound implements Round {
   return new UnoRound(state, shuffler)
 }
 
+//#endregion
+
+//#region Players and round state
+
 get playerCount(): number
 {
   return this.players.length
@@ -340,6 +360,10 @@ score(): number | undefined
 
   return this.hands.reduce((total, hand) => total + hand.score(), 0)
 }
+
+//#endregion
+
+//#region Playing cards
 
  canPlay(index: number): boolean
 {
@@ -492,6 +516,10 @@ play(index: number, color?: Color): Card
   return card
 }
 
+//#endregion
+
+//#region Drawing cards
+
   private refillDrawPile(): void
 {
   if (this.drawCards.size > 0 || this.discardedCards.size <= 1)
@@ -572,6 +600,10 @@ pass(): void
   this.turn = this.nextPlayer(player)
 }
 
+//#endregion
+
+//#region UNO
+
 sayUno(player: number): void
 {
   this.activePlayer()
@@ -609,6 +641,10 @@ catchUnoFailure(
   return true
 }
 
+//#endregion
+
+//#region Round events and memento
+
 onEnd(callback: (event: RoundEnd) => void): void
 {
   this.endCallbacks.push(callback)
@@ -644,4 +680,8 @@ onEnd(callback: (event: RoundEnd) => void): void
 
     return state
   }
+
+  //#endregion
 }
+
+//#endregion
