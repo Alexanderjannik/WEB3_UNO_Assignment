@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { colors, type Color } from '../model/deck'
-import type { RoundMemento } from '../model/round'
+import type { BoardState } from '../model/board'
 import UnoCard from './UnoCard.vue'
 
 //#region Props and events
 
 const props = defineProps<{
-  state: RoundMemento
-  playableCards: number[]
+  state: BoardState
+  busy?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -24,6 +24,10 @@ const emit = defineEmits<{
 //#region Card selection
 
 const selectedCard = ref<number | undefined>(undefined)
+const opponents = computed(() => props.state.players
+  .map((name, index) => ({ name, index }))
+  .filter(player => player.index !== props.state.playerIndex))
+const inTurn = computed(() => props.state.playerInTurn === props.state.playerIndex)
 
 watch(() => props.state, () =>
 {
@@ -32,9 +36,9 @@ watch(() => props.state, () =>
 
 function selectCard(index: number): void
 {
-  if (!props.playableCards.includes(index)) return
+  if (props.busy || !props.state.playableCards.includes(index)) return
 
-  const card = props.state.hands[0][index]
+  const card = props.state.hand[index]
 
   if ('color' in card)
   {
@@ -63,23 +67,24 @@ function chooseColor(color: Color): void
 
     <div class="opponents">
       <article
-        v-for="(name, index) in state.players.slice(1)"
+        v-for="{ name, index } in opponents"
         :key="index"
         class="opponent"
-        :class="{ active: state.playerInTurn === index + 1 }"
+        :class="{ active: state.playerInTurn === index }"
       >
         <h3>{{ name }}</h3>
 
-        <p>{{ state.hands[index + 1].length }} cards</p>
+        <p>{{ state.handSizes[index] }} cards</p>
 
-        <span v-if="state.playerInTurn === index + 1">
+        <span v-if="state.playerInTurn === index">
           In turn
         </span>
 
         <button
-          v-if="state.hands[index + 1].length === 1"
+          v-if="state.handSizes[index] === 1"
           type="button"
-          @click="emit('catchUno', index + 1)"
+          :disabled="busy"
+          @click="emit('catchUno', index)"
         >
           Catch missed UNO
         </button>
@@ -87,7 +92,7 @@ function chooseColor(color: Color): void
     </div>
 
     <div class="round-status" aria-live="polite">
-      <p v-if="state.playerInTurn !== undefined">
+      <p v-if="state.playerInTurn != null">
         <strong>
           {{ state.players[state.playerInTurn] }}'s turn
         </strong>
@@ -109,7 +114,7 @@ function chooseColor(color: Color): void
 
         <div class="draw-pile">
           <strong>UNO</strong>
-          <span>{{ state.drawPile.length }} cards</span>
+          <span>{{ state.drawPileSize }} cards</span>
         </div>
       </div>
 
@@ -117,25 +122,24 @@ function chooseColor(color: Color): void
         <h3>Discard pile</h3>
 
         <UnoCard
-          v-if="state.discardPile[0]"
-          :card="state.discardPile[0]"
+          :card="state.topCard"
         />
       </div>
     </div>
 
     <section>
       <h3>
-        {{ state.players[0] }} — your hand
-        ({{ state.hands[0].length }} cards)
+        {{ state.players[state.playerIndex] }} — your hand
+        ({{ state.hand.length }} cards)
       </h3>
 
       <div class="hand">
         <button
-          v-for="(card, index) in state.hands[0]"
+          v-for="(card, index) in state.hand"
           :key="index"
           type="button"
           class="hand-card"
-          :disabled="!playableCards.includes(index) || selectedCard !== undefined"
+          :disabled="busy || !state.playableCards.includes(index) || selectedCard !== undefined"
           @click="selectCard(index)"
         >
           <UnoCard :card="card" />
@@ -145,34 +149,34 @@ function chooseColor(color: Color): void
 
     <section v-if="selectedCard !== undefined" class="color-choice" aria-label="Choose a wild card color">
       <h3>Choose a color</h3>
-      <button v-for="color in colors" :key="color" type="button" @click="chooseColor(color)">
+      <button v-for="color in colors" :key="color" type="button" :disabled="busy" @click="chooseColor(color)">
         {{ color }}
       </button>
       <button type="button" @click="selectedCard = undefined">Cancel</button>
     </section>
 
-    <p v-if="state.playerInTurn === 0 && state.drawnCardIndex !== undefined">
-      Play the card you just drew, or pass.
+    <p v-if="inTurn && state.drawnCardIndex != null">
+      Play the drawn card or pass.
     </p>
 
     <div class="actions">
       <button
         type="button"
-        :disabled="state.playerInTurn !== 0 || state.drawnCardIndex !== undefined || selectedCard !== undefined"
+        :disabled="busy || !inTurn || state.drawnCardIndex != null || selectedCard !== undefined"
         @click="emit('draw')"
       >
         Draw card
       </button>
       <button
         type="button"
-        :disabled="state.playerInTurn !== 0 || state.drawnCardIndex === undefined || selectedCard !== undefined"
+        :disabled="busy || !inTurn || state.drawnCardIndex == null || selectedCard !== undefined"
         @click="emit('pass')"
       >
         Pass
       </button>
       <button
         type="button"
-        :disabled="!(state.playerInTurn === 0 && state.hands[0].length === 2) && state.unoVulnerablePlayer !== 0"
+        :disabled="busy || (!(inTurn && state.hand.length === 2) && state.unoVulnerablePlayer !== state.playerIndex)"
         @click="emit('uno')"
       >
         UNO!

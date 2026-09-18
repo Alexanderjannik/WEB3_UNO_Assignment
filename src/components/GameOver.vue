@@ -17,7 +17,7 @@ const emit = defineEmits<{
 <template>
   <section aria-labelledby="result-title">
     <h2 id="result-title">Round over</h2>
-    <p>{{ winner }} won the round!</p>
+    <p>{{ winner }} won!</p>
     <p>Round score: {{ score }}</p>
 
     <div class="actions">
