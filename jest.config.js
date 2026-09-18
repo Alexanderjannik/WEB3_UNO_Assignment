@@ -1,5 +1,6 @@
 
 module.exports = {
+  roots: ['<rootDir>/__test__'],
 
   coverageProvider: "v8",
 

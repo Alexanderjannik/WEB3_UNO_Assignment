@@ -38,7 +38,7 @@ function startGame(): void
 
 <template>
   <section>
-    <h2>Set up your game</h2>
+    <h2>Game setup</h2>
 
     <form class="setup-form" @submit.prevent="startGame">
       <label for="player-name">Your name</label>
