@@ -1,6 +1,12 @@
+//#region Randomizer
+
 export type Randomizer = (bound: number) => number
 
 export const standardRandomizer: Randomizer = n => Math.floor(Math.random() * n)
+
+//#endregion
+
+//#region Shuffler
 
 export type Shuffler<T> = (cards: T[]) => void
 
@@ -12,4 +18,6 @@ export function standardShuffler<T>(cards: T[]) {
     cards[i] = temp
   }
 }
+
+//#endregion
 
