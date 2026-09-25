@@ -1,10 +1,14 @@
-{
+﻿{
   "compilerOptions": {
     "strict": true,
-    "outDir": "./dist/",
-    "sourceMap": true,
     "target": "ES2022",
-    "lib":["ES2022", "DOM"],
-    "moduleResolution": "Node"
-  }
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM"],
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": ["server/**/*.ts", "src/**/*.ts", "src/**/*.tsx", "__test__/**/*.ts", "vite.config.mts"],
+  "exclude": ["node_modules", "dist"]
 }

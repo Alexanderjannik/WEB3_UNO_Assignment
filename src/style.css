@@ -1,0 +1,61 @@
+.app
+{
+  max-width: 960px;
+  margin: 40px auto;
+  padding: 24px;
+  font-family: Arial, sans-serif;
+}
+
+h1 { margin-top: 0; }
+.menu, .setup-form, .account { display: flex; flex-direction: column; gap: 12px; max-width: 360px; }
+button, input, select
+{
+  padding: 12px;
+  font: inherit;
+  border: 1px solid #999;
+  border-radius: 6px;
+}
+button { cursor: pointer; }
+button:disabled { opacity: .55; cursor: not-allowed; }
+.back { margin-top: 24px; }
+.game-board { display: flex; flex-direction: column; gap: 24px; }
+.opponents, .piles, .hand, .actions, .color-choice, .challenge, .join
+{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.opponent { min-width: 120px; padding: 16px; border: 2px solid #ddd; border-radius: 8px; }
+.opponent.active { border-color: #1d4ed8; background: #eff6ff; }
+.opponent h3, .pile h3 { margin-top: 0; }
+.round-status p { margin: 6px 0; }
+.piles { gap: 40px; }
+.draw-pile, .uno-card
+{
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 100px;
+  height: 150px;
+  padding: 10px;
+  border: 3px solid white;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px #0003;
+}
+.draw-pile { align-items: center; justify-content: center; gap: 16px; color: white; background: #222; }
+.uno-card { color: white; }
+.red { background: #b91c1c; }
+.blue { background: #1d4ed8; }
+.green { background: #166534; }
+.yellow { background: #facc15; color: #222; }
+.wild { background: #222; }
+.card-symbol { align-self: center; font-size: 40px; }
+.card-color, .card-type { font-size: 11px; font-weight: bold; }
+.card-type { text-align: right; }
+.hand-card { padding: 0; border: 0; border-radius: 12px; background: transparent; }
+.hand-card:focus-visible { outline: 3px solid #222; outline-offset: 3px; }
+.color-choice h3 { width: 100%; }
+li { margin-bottom: 12px; }
+table { border-collapse: collapse; }
+th, td { padding: 10px 16px; text-align: left; border-bottom: 1px solid #ddd; }

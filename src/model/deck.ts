@@ -42,6 +42,31 @@ export function cardPoints(card: Card): number
   return 20
 }
 
+export function readCard(value: Record<string, unknown>): Card
+{
+  const type = value.type
+  if (type === 'WILD' || type === 'WILD DRAW') return { type }
+
+  const color = value.color
+  if (color !== 'BLUE' && color !== 'GREEN' && color !== 'RED' && color !== 'YELLOW')
+  {
+    throw new Error('Invalid card color')
+  }
+
+  if (type === 'NUMBERED')
+  {
+    const number = value.number
+    if (typeof number !== 'number' || !Number.isInteger(number) || number < 0 || number > 9)
+    {
+      throw new Error('Card number must be 0 to 9')
+    }
+    return { type, color, number: number as CardNumber }
+  }
+
+  if (type === 'SKIP' || type === 'REVERSE' || type === 'DRAW') return { type, color }
+  throw new Error('Invalid card type')
+}
+
 export function createInitialDeck(): Card[]
 {
   const cards: Card[] = []
