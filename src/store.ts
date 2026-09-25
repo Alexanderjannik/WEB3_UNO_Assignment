@@ -50,7 +50,7 @@ type OnlineState = {
 }
 
 const initialOnlineState: OnlineState = {
-  token: sessionStorage.getItem('uno-token') ?? '',
+  token: '',
   rooms: [], scores: [], connected: false, busy: false, error: ''
 }
 
@@ -58,6 +58,10 @@ const onlineSlice = createSlice({
   name: 'online',
   initialState: initialOnlineState,
   reducers: {
+    setToken(state, action: PayloadAction<string>): OnlineState
+    {
+      return { ...state, token: action.payload }
+    },
     setAccount(state, action: PayloadAction<{ token: string; player: Player }>): OnlineState
     {
       return { ...state, token: action.payload.token, player: action.payload.player, error: '' }
@@ -100,15 +104,19 @@ const onlineSlice = createSlice({
 export const localActions = localSlice.actions
 export const onlineActions = onlineSlice.actions
 
-export const store = configureStore({
-  reducer: { local: localSlice.reducer, online: onlineSlice.reducer },
-  middleware: getDefaultMiddleware => getDefaultMiddleware({
-    serializableCheck: {
-      ignoredActions: ['local/updateLocalRound'],
-      ignoredPaths: ['local.round']
-    }
+export function makeStore()
+{
+  return configureStore({
+    reducer: { local: localSlice.reducer, online: onlineSlice.reducer },
+    middleware: getDefaultMiddleware => getDefaultMiddleware({
+      serializableCheck: {
+        ignoredActions: ['local/updateLocalRound'],
+        ignoredPaths: ['local.round']
+      }
+    })
   })
-})
+}
 
-export type RootState = ReturnType<typeof store.getState>
-export type AppDispatch = typeof store.dispatch
+export type AppStore = ReturnType<typeof makeStore>
+export type RootState = ReturnType<AppStore['getState']>
+export type AppDispatch = AppStore['dispatch']

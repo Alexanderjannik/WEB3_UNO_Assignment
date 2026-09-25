@@ -2,7 +2,7 @@ import { startServer } from './index'
 
 //#region Start server
 
-const port = Number(process.env.PORT ?? 4000)
+const port = Number(process.env.GRAPHQL_PORT ?? 4000)
 
 startServer(port, process.env.PLAYER_FILE ?? 'data/players.json').then(() =>
 {

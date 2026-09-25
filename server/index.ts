@@ -1,5 +1,4 @@
 import { createServer } from 'node:http'
-import { resolve } from 'node:path'
 import express from 'express'
 import { ApolloServer } from '@apollo/server'
 import { expressMiddleware } from '@as-integrations/express5'
@@ -43,8 +42,6 @@ export async function startServer(port = 4000, filename = 'data/players.json')
   app.use('/graphql', express.json({ limit: '32kb' }), expressMiddleware(apollo, {
     context: async ({ req }) => ({ token: req.headers.authorization?.replace(/^Bearer /, '') ?? '' })
   }))
-  app.use(express.static(resolve('dist')))
-
   await new Promise<void>((resolve, reject) =>
   {
     httpServer.once('error', reject)

@@ -58,7 +58,8 @@ export function watchRoom(id: string, token: string, connected: (value: boolean)
   {
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
     const client = createClient({
-      url: `${protocol}//${location.host}/graphql`,
+      url: process.env.NEXT_PUBLIC_GRAPHQL_WS_URL
+        ?? `${protocol}//${location.hostname}:4000/graphql`,
       connectionParams: { token },
       retryAttempts: 5,
       on: { connected: () => connected(true), closed: () => connected(false) }

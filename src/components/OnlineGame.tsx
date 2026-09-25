@@ -61,7 +61,7 @@ export default function OnlineGame({ onBack }: { onBack: () => void })
       }
       await loadLobby(online.token)
     })
-  }, [])
+  }, [online.token, online.player])
 
   useEffect(() =>
   {
