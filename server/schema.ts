@@ -7,7 +7,7 @@ import { GameStore } from './games'
 
 const typeDefs = `
   enum Color { BLUE GREEN RED YELLOW }
-  enum ActionType { PLAY DRAW PASS UNO CATCH }
+  enum ActionType { PLAY DRAW PASS UNO CATCH CHALLENGE ACCEPT }
   enum RoomStatus { WAITING PLAYING FINISHED CANCELLED }
 
   type Player { id: ID!, name: String!, score: Int!, wins: Int! }
@@ -25,6 +25,7 @@ const typeDefs = `
     playerInTurn: Int
     drawnCardIndex: Int
     unoVulnerablePlayer: Int
+    wildDrawFourChallenger: Int
     playableCards: [Int!]!
   }
   type Room {

@@ -16,6 +16,11 @@ export type RoundMemento = {
   drawnCardIndex?: number
   unoDeclaredBy?: number
   unoVulnerablePlayer?: number
+  wildDrawFourChallenge?: {
+    challenger: number
+    offender: number
+    previousColor: Color
+  }
 }
 
 export type RoundConfig = {
@@ -46,6 +51,8 @@ export interface Round {
   pass(): void
   sayUno(player: number): void
   catchUnoFailure(players: { accuser: number; accused: number }): boolean
+  challengeWildDrawFour(player: number): boolean
+  acceptWildDrawFour(player: number): void
   hasEnded(): boolean
   winner(): number | undefined
   score(): number | undefined
@@ -70,6 +77,7 @@ export class UnoRound implements Round {
   private drawnCardIndex: number | undefined
   private unoDeclaredBy: number | undefined
   private unoVulnerablePlayer: number | undefined
+  private wildDrawFourChallenge: RoundMemento['wildDrawFourChallenge']
   private endCallbacks: ((event: RoundEnd) => void)[] = []
   readonly dealer: number
 
@@ -136,6 +144,23 @@ export class UnoRound implements Round {
   }
 
   this.direction = state.currentDirection === 'clockwise' ? 1 : -1
+
+  this.wildDrawFourChallenge = state.wildDrawFourChallenge
+
+  if (this.wildDrawFourChallenge)
+  {
+    this.checkPlayer(this.wildDrawFourChallenge.challenger)
+    this.checkPlayer(this.wildDrawFourChallenge.offender)
+
+    if (
+      this.wildDrawFourChallenge.challenger === this.wildDrawFourChallenge.offender ||
+      !colors.includes(this.wildDrawFourChallenge.previousColor) ||
+      state.playerInTurn !== this.wildDrawFourChallenge.challenger
+    )
+    {
+      throw new Error('Invalid Wild Draw Four challenge')
+    }
+  }
 
   const roundHasEnded = this.hasEnded()
 
@@ -339,9 +364,14 @@ discardPile(): Deck
   return this.discardedCards
 }
 
-winner(): number | undefined
-{
-  const winner = this.hands.findIndex(hand => hand.size === 0)
+  winner(): number | undefined
+  {
+    if (this.wildDrawFourChallenge)
+    {
+      return undefined
+    }
+
+    const winner = this.hands.findIndex(hand => hand.size === 0)
 
   return winner === -1 ? undefined : winner
 }
@@ -372,6 +402,11 @@ score(): number | undefined
     return false
   }
 
+  if (this.wildDrawFourChallenge)
+  {
+    return false
+  }
+
   const hand = this.hands[this.turn]
   const card = hand.cards[index]
 
@@ -388,18 +423,9 @@ score(): number | undefined
     return false
   }
 
-  if (card.type === 'WILD')
+  if (card.type === 'WILD' || card.type === 'WILD DRAW')
   {
     return true
-  }
-
-  if (card.type === 'WILD DRAW')
-  {
-    const hasMatchingColor = hand.cards.some(
-      other => hasColor(other, this.currentColor)
-    )
-
-    return !hasMatchingColor
   }
 
   if (card.color === this.currentColor)
@@ -433,12 +459,18 @@ play(index: number, color?: Color): Card
 {
   const player = this.activePlayer()
 
+  if (this.wildDrawFourChallenge)
+  {
+    throw new Error('Accept or challenge the Wild Draw Four first')
+  }
+
   if (!this.canPlay(index))
   {
     throw new Error('That card cannot be played')
   }
 
   const card = this.hands[player].cards[index]
+  const previousColor = this.currentColor
 
   if ('color' in card)
   {
@@ -489,29 +521,26 @@ play(index: number, color?: Color): Card
   if (card.type === 'DRAW' || card.type === 'WILD DRAW')
   {
     const nextPlayer = this.nextPlayer(player)
-    const cardsToDraw = card.type === 'DRAW' ? 2 : 4
 
-    this.giveCards(nextPlayer, cardsToDraw)
-
-    steps = 2
-  }
-
-  const winner = this.winner()
-
-  if (winner !== undefined)
-  {
-    this.turn = undefined
-    this.unoVulnerablePlayer = undefined
-
-    for (const callback of this.endCallbacks)
+    if (card.type === 'DRAW')
     {
-      callback({ winner })
+      this.giveCards(nextPlayer, 2)
+      steps = 2
     }
+    else
+    {
+      this.wildDrawFourChallenge = {
+        challenger: nextPlayer,
+        offender: player,
+        previousColor
+      }
+      steps = 1
+    }
+
   }
-  else
-  {
-    this.turn = this.nextPlayer(player, steps)
-  }
+
+  this.turn = this.nextPlayer(player, steps)
+  this.endIfNeeded()
 
   return card
 }
@@ -558,6 +587,11 @@ draw(): void
 {
   const player = this.activePlayer()
 
+  if (this.wildDrawFourChallenge)
+  {
+    throw new Error('Accept or challenge the Wild Draw Four first')
+  }
+
   if (this.drawnCardIndex !== undefined)
   {
     throw new Error('Play the drawn card or pass')
@@ -587,6 +621,11 @@ draw(): void
 pass(): void
 {
   const player = this.activePlayer()
+
+  if (this.wildDrawFourChallenge)
+  {
+    throw new Error('Accept or challenge the Wild Draw Four first')
+  }
 
   if (this.drawnCardIndex === undefined)
   {
@@ -641,6 +680,71 @@ catchUnoFailure(
   return true
 }
 
+challengeWildDrawFour(player: number): boolean
+{
+  const challenge = this.wildDrawFourChallenge
+
+  if (!challenge || player !== challenge.challenger)
+  {
+    throw new Error('Only the next player can challenge the Wild Draw Four')
+  }
+
+  const offenderHasMatchingColor = this.hands[challenge.offender].cards.some(
+    card => hasColor(card, challenge.previousColor)
+  )
+
+  this.wildDrawFourChallenge = undefined
+  this.unoVulnerablePlayer = undefined
+
+  if (offenderHasMatchingColor)
+  {
+    this.giveCards(challenge.offender, 4)
+    this.turn = challenge.challenger
+  }
+  else
+  {
+    this.giveCards(challenge.challenger, 6)
+    this.turn = this.nextPlayer(challenge.challenger)
+  }
+
+  this.endIfNeeded()
+  return offenderHasMatchingColor
+}
+
+acceptWildDrawFour(player: number): void
+{
+  const challenge = this.wildDrawFourChallenge
+
+  if (!challenge || player !== challenge.challenger)
+  {
+    throw new Error('Only the next player can accept the Wild Draw Four')
+  }
+
+  this.wildDrawFourChallenge = undefined
+  this.unoVulnerablePlayer = undefined
+  this.giveCards(challenge.challenger, 4)
+  this.turn = this.nextPlayer(challenge.challenger)
+  this.endIfNeeded()
+}
+
+private endIfNeeded(): void
+{
+  const winner = this.winner()
+
+  if (winner === undefined)
+  {
+    return
+  }
+
+  this.turn = undefined
+  this.unoVulnerablePlayer = undefined
+
+  for (const callback of this.endCallbacks)
+  {
+    callback({ winner })
+  }
+}
+
 //#endregion
 
 //#region Round events and memento
@@ -676,6 +780,11 @@ onEnd(callback: (event: RoundEnd) => void): void
     if (this.unoVulnerablePlayer !== undefined)
     {
       state.unoVulnerablePlayer = this.unoVulnerablePlayer
+    }
+
+    if (this.wildDrawFourChallenge)
+    {
+      state.wildDrawFourChallenge = { ...this.wildDrawFourChallenge }
     }
 
     return state

@@ -15,6 +15,7 @@ export type BoardState = {
   playerInTurn?: number | null
   drawnCardIndex?: number | null
   unoVulnerablePlayer?: number | null
+  wildDrawFourChallenger?: number | null
   playableCards: number[]
 }
 
@@ -35,6 +36,7 @@ export function createBoard(round: Round, player: number): BoardState
     playerInTurn: state.playerInTurn,
     drawnCardIndex: state.playerInTurn === player ? state.drawnCardIndex : undefined,
     unoVulnerablePlayer: state.unoVulnerablePlayer,
+    wildDrawFourChallenger: state.wildDrawFourChallenge?.challenger,
     playableCards: state.playerInTurn === player
       ? hand.map((card, index) => index).filter(index => round.canPlay(index))
       : []

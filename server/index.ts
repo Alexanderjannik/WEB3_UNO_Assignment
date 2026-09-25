@@ -33,7 +33,12 @@ export async function startServer(port = 4000, filename = 'data/players.json')
       {
         async serverWillStart()
         {
-          return { async drainServer() { await subscriptions.dispose() } }
+          return {
+            async drainServer()
+            {
+              await subscriptions.dispose()
+            }
+          }
         }
       }
     ]

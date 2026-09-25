@@ -124,6 +124,32 @@ function catchUno(player: number): void
   })
 }
 
+function challengeWildDrawFour(): void
+{
+  if (!round.value) return
+
+  updateRound(() =>
+  {
+    const challenger = round.value!.playerInTurn()!
+    const caught = round.value!.challengeWildDrawFour(challenger)
+    message.value = caught
+      ? 'Challenge successful. The player who played the card draws four.'
+      : 'Challenge unsuccessful. You draw six cards.'
+  })
+}
+
+function acceptWildDrawFour(): void
+{
+  if (!round.value) return
+
+  updateRound(() =>
+  {
+    const challenger = round.value!.playerInTurn()!
+    round.value!.acceptWildDrawFour(challenger)
+    message.value = 'You accepted the penalty and drew four cards.'
+  })
+}
+
 //#endregion
 
 //#region Bot turns
@@ -181,6 +207,18 @@ function receiveBotAction(player: number, response: BotResponse): void
       currentRound.catchUnoFailure({ accuser: player, accused: action.player })
       message.value = `${name} caught ${currentRound.player(action.player)}. Four cards drawn.`
     }
+    else if (action.type === 'CHALLENGE')
+    {
+      const successful = currentRound.challengeWildDrawFour(player)
+      message.value = successful
+        ? `${name} successfully challenged the Wild Draw Four.`
+        : `${name}'s challenge failed and they draw six cards.`
+    }
+    else if (action.type === 'ACCEPT')
+    {
+      currentRound.acceptWildDrawFour(player)
+      message.value = `${name} accepted the Wild Draw Four and drew four cards.`
+    }
     else if (action.type === 'DRAW')
     {
       currentRound.draw()
@@ -231,6 +269,8 @@ function receiveBotAction(player: number, response: BotResponse): void
         @pass="passTurn"
         @uno="sayUno"
         @catch-uno="catchUno"
+        @challenge="challengeWildDrawFour"
+        @accept="acceptWildDrawFour"
       />
 
       <p role="status">{{ message }}</p>

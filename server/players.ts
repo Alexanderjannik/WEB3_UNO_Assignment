@@ -41,7 +41,10 @@ export class PlayerStore
   {
     const player = this.players.find(player => player.id === id)
 
-    if (!player) throw new Error('Player not found')
+    if (!player)
+    {
+      throw new Error('Player not found')
+    }
 
     return { id: player.id, name: player.name, score: player.score, wins: player.wins }
   }

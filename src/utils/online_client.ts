@@ -9,7 +9,7 @@ export const roomFields = `
   players { id name score wins }
   board {
     players playerIndex handSizes drawPileSize currentColor currentDirection
-    playerInTurn drawnCardIndex unoVulnerablePlayer playableCards
+    playerInTurn drawnCardIndex unoVulnerablePlayer wildDrawFourChallenger playableCards
     hand { type color number }
     topCard { type color number }
   }

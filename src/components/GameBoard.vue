@@ -17,6 +17,8 @@ const emit = defineEmits<{
   pass: []
   uno: []
   catchUno: [player: number]
+  challenge: []
+  accept: []
 }>()
 
 //#endregion
@@ -28,6 +30,9 @@ const opponents = computed(() => props.state.players
   .map((name, index) => ({ name, index }))
   .filter(player => player.index !== props.state.playerIndex))
 const inTurn = computed(() => props.state.playerInTurn === props.state.playerIndex)
+const mustAnswerWildDrawFour = computed(() =>
+  props.state.wildDrawFourChallenger === props.state.playerIndex
+)
 
 watch(() => props.state, () =>
 {
@@ -159,24 +164,30 @@ function chooseColor(color: Color): void
       Play the drawn card or pass.
     </p>
 
+    <section v-if="mustAnswerWildDrawFour" class="challenge" aria-label="Wild Draw Four decision">
+      <p>You were given a Wild Draw Four. Challenge it or accept the four-card penalty.</p>
+      <button type="button" :disabled="busy" @click="emit('challenge')">Challenge</button>
+      <button type="button" :disabled="busy" @click="emit('accept')">Accept and draw four</button>
+    </section>
+
     <div class="actions">
       <button
         type="button"
-        :disabled="busy || !inTurn || state.drawnCardIndex != null || selectedCard !== undefined"
+        :disabled="busy || !inTurn || mustAnswerWildDrawFour || state.drawnCardIndex != null || selectedCard !== undefined"
         @click="emit('draw')"
       >
         Draw card
       </button>
       <button
         type="button"
-        :disabled="busy || !inTurn || state.drawnCardIndex == null || selectedCard !== undefined"
+        :disabled="busy || !inTurn || mustAnswerWildDrawFour || state.drawnCardIndex == null || selectedCard !== undefined"
         @click="emit('pass')"
       >
         Pass
       </button>
       <button
         type="button"
-        :disabled="busy || (!(inTurn && state.hand.length === 2) && state.unoVulnerablePlayer !== state.playerIndex)"
+        :disabled="busy || mustAnswerWildDrawFour || (!(inTurn && state.hand.length === 2) && state.unoVulnerablePlayer !== state.playerIndex)"
         @click="emit('uno')"
       >
         UNO!
@@ -288,7 +299,8 @@ button:disabled
 }
 
 .actions,
-.color-choice
+.color-choice,
+.challenge
 {
   display: flex;
   flex-wrap: wrap;

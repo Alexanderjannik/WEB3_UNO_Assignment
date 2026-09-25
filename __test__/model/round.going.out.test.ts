@@ -366,6 +366,7 @@ describe("callback", () => {
     round.draw()
     round.play(1)
     round.play(0, 'YELLOW')
+    round.acceptWildDrawFour(round.playerInTurn()!)
     expect(events).toEqual([{winner: 1}])
   })
   test("all callbacks get called at the end of the hand", () => {
@@ -376,6 +377,7 @@ describe("callback", () => {
     round.draw()
     round.play(1)
     round.play(0, 'YELLOW')
+    round.acceptWildDrawFour(round.playerInTurn()!)
     expect(events).toEqual([{winner: 1}, {winner: 1}])
   })
 })

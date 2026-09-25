@@ -28,7 +28,9 @@ export class GameStore
   private playerRooms = new Map<string, string>()
   private events = new PubSub()
 
-  constructor(private players: PlayerStore) {}
+  constructor(private players: PlayerStore)
+  {
+  }
 
   //#region Lobby
 
@@ -46,13 +48,23 @@ export class GameStore
 
   create(player: string): RoomState
   {
-    if (this.playerRooms.has(player)) throw new Error('Leave your current game first')
+    if (this.playerRooms.has(player))
+    {
+      throw new Error('Leave your current game first')
+    }
 
     let id = randomBytes(3).toString('hex').toUpperCase()
-    while (this.rooms.has(id)) id = randomBytes(3).toString('hex').toUpperCase()
+    while (this.rooms.has(id))
+    {
+      id = randomBytes(3).toString('hex').toUpperCase()
+    }
 
     const room: Room = {
-      id, hostId: player, players: [player], status: 'WAITING', version: 0,
+      id,
+      hostId: player,
+      players: [player],
+      status: 'WAITING',
+      version: 0,
       message: `${this.players.player(player).name} created the game`
     }
 
@@ -63,11 +75,21 @@ export class GameStore
 
   join(id: string, player: string): RoomState
   {
-    if (this.playerRooms.has(player)) throw new Error('Leave your current game first')
+    if (this.playerRooms.has(player))
+    {
+      throw new Error('Leave your current game first')
+    }
 
     const room = this.find(id)
-    if (room.status !== 'WAITING') throw new Error('That game has already started')
-    if (room.players.length === 4) throw new Error('That game is full')
+    if (room.status !== 'WAITING')
+    {
+      throw new Error('That game has already started')
+    }
+
+    if (room.players.length === 4)
+    {
+      throw new Error('That game is full')
+    }
 
     room.players.push(player)
     this.playerRooms.set(player, id)
@@ -79,9 +101,20 @@ export class GameStore
   start(id: string, player: string): RoomState
   {
     const room = this.member(id, player)
-    if (room.hostId !== player) throw new Error('Only the host can start the round')
-    if (room.status !== 'WAITING') throw new Error('That game has already started')
-    if (room.players.length < 2) throw new Error('Wait for at least one other player')
+    if (room.hostId !== player)
+    {
+      throw new Error('Only the host can start the round')
+    }
+
+    if (room.status !== 'WAITING')
+    {
+      throw new Error('That game has already started')
+    }
+
+    if (room.players.length < 2)
+    {
+      throw new Error('Wait for at least one other player')
+    }
 
     room.round = UnoRound.create({
       players: room.players.map(id => this.players.player(id).name),
@@ -102,7 +135,10 @@ export class GameStore
     if (room.status === 'WAITING')
     {
       room.players = room.players.filter(id => id !== player)
-      if (room.hostId === player) room.hostId = room.players[0]
+      if (room.hostId === player)
+      {
+        room.hostId = room.players[0]
+      }
     }
     else if (room.status === 'PLAYING')
     {
@@ -122,8 +158,15 @@ export class GameStore
   act(id: string, player: string, version: number, action: PlayerAction): RoomState
   {
     const room = this.member(id, player)
-    if (room.status !== 'PLAYING' || !room.round) throw new Error('There is no active round')
-    if (room.version !== version) throw new Error('The game changed. Try your action again.')
+    if (room.status !== 'PLAYING' || !room.round)
+    {
+      throw new Error('There is no active round')
+    }
+
+    if (room.version !== version)
+    {
+      throw new Error('The game changed. Try your action again.')
+    }
 
     const index = room.players.indexOf(player)
     const round = UnoRound.fromMemento(room.round.toMemento())
@@ -137,17 +180,28 @@ export class GameStore
     }
     else if (action.type === 'CATCH')
     {
-      if (action.accused === undefined) throw new Error('Choose a player to accuse')
+      if (action.accused === undefined)
+      {
+        throw new Error('Choose a player to accuse')
+      }
       const caught = round.catchUnoFailure({ accuser: index, accused: action.accused })
-      message = caught ? `${name} caught ${round.player(action.accused)}. Four cards drawn.` : `${name} made an unsuccessful UNO accusation`
+      message = caught
+        ? `${name} caught ${round.player(action.accused)}. Four cards drawn.`
+        : `${name} made an unsuccessful UNO accusation`
     }
     else
     {
-      if (round.playerInTurn() !== index) throw new Error('Wait for your turn')
+      if (round.playerInTurn() !== index)
+      {
+        throw new Error('Wait for your turn')
+      }
 
       if (action.type === 'PLAY')
       {
-        if (action.index === undefined) throw new Error('Choose a card')
+        if (action.index === undefined)
+        {
+          throw new Error('Choose a card')
+        }
         round.play(action.index, action.color)
         message = `${name} played a card`
       }
@@ -161,7 +215,22 @@ export class GameStore
         round.pass()
         message = `${name} passed`
       }
-      else throw new Error('Unknown action')
+      else if (action.type === 'CHALLENGE')
+      {
+        const successful = round.challengeWildDrawFour(index)
+        message = successful
+          ? `${name} successfully challenged the Wild Draw Four.`
+          : `${name}'s challenge failed and they draw six cards.`
+      }
+      else if (action.type === 'ACCEPT')
+      {
+        round.acceptWildDrawFour(index)
+        message = `${name} accepted the Wild Draw Four and drew four cards.`
+      }
+      else
+      {
+        throw new Error('Unknown action')
+      }
     }
 
     if (round.hasEnded())
@@ -184,14 +253,22 @@ export class GameStore
   private find(id: string): Room
   {
     const room = this.rooms.get(id)
-    if (!room) throw new Error('Game not found')
+    if (!room)
+    {
+      throw new Error('Game not found')
+    }
+
     return room
   }
 
   private member(id: string, player: string): Room
   {
     const room = this.find(id)
-    if (this.playerRooms.get(player) !== id) throw new Error('You are not in that game')
+    if (this.playerRooms.get(player) !== id)
+    {
+      throw new Error('You are not in that game')
+    }
+
     return room
   }
 
@@ -239,7 +316,10 @@ export class GameStore
       [Symbol.asyncIterator]() { return this },
       async next()
       {
-        if (closed) return { done: true, value: undefined }
+        if (closed)
+        {
+          return { done: true, value: undefined }
+        }
         if (first)
         {
           first = false
@@ -247,7 +327,11 @@ export class GameStore
         }
 
         const update = await next
-        if (!update.done) next = updates.next()
+        if (!update.done)
+        {
+          next = updates.next()
+        }
+
         return update
       },
       async return()

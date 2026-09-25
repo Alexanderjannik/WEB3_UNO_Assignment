@@ -23,7 +23,7 @@ export type RoomState = {
 }
 
 export type PlayerAction = {
-  type: 'PLAY' | 'DRAW' | 'PASS' | 'UNO' | 'CATCH'
+  type: 'PLAY' | 'DRAW' | 'PASS' | 'UNO' | 'CATCH' | 'CHALLENGE' | 'ACCEPT'
   index?: number
   color?: Color
   accused?: number

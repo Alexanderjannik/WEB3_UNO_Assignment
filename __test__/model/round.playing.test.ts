@@ -56,7 +56,7 @@ describe("Playing a card", () => {
   })
 
   describe("Playing a skip card", () => {
-    it("skips the next player", () => {
+    it("lets the next player accept the penalty and skips them", () => {
       const shuffler = shuffleBuilder()
         .discard()
           .is({type: 'NUMBERED', color: 'BLUE', number: 6})
@@ -172,26 +172,36 @@ describe("Playing a card", () => {
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
       expect(round.playerInTurn()).toEqual(0)
       round.play(0, 'RED')
-      expect(round.playerInTurn()).toEqual(2)
+      const restoredRound = createRoundFromMemento(round.toMemento())
+      expect(restoredRound.playerInTurn()).toEqual(1)
+      restoredRound.acceptWildDrawFour(1)
+      expect(restoredRound.playerInTurn()).toEqual(2)
     })
-    it("gives the next player 4 cards", () => {
+    it("gives the next player 6 cards after a failed challenge", () => {
       const shuffler = builder.build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
       round.play(0, 'RED')
-      expect(round.playerHand(1).length).toEqual(11)
+      expect(round.challengeWildDrawFour(1)).toBeFalsy()
+      expect(round.playerHand(1).length).toEqual(13)
+      expect(round.playerInTurn()).toEqual(2)
     })
     it("takes the 4 cards from the draw pile", () => {
       const shuffler = builder.build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
       const pileSize = round.drawPile().size
       round.play(0, 'RED')
+      round.acceptWildDrawFour(1)
       expect(round.drawPile().size).toEqual(pileSize - 4)
     })
     it("changes color to the chosen color", () => {
-      builder.hand(2).is({color: 'RED'})
+      builder.hand(0).is({type: 'WILD DRAW'}, {color: 'BLUE'})
+      builder.hand(1).is({color: 'RED'})
       const shuffler = builder.build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
       round.play(0, 'RED')
+      expect(round.challengeWildDrawFour(1)).toBeTruthy()
+      expect(round.playerHand(0).length).toEqual(10)
+      expect(round.playerInTurn()).toEqual(1)
       expect(round.canPlay(0)).toBeTruthy()
     })
   })

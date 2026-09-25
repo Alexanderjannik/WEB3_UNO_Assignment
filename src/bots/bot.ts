@@ -8,6 +8,8 @@ export type BotAction =
   | { type: 'DRAW' }
   | { type: 'PASS' }
   | { type: 'CATCH'; player: number }
+  | { type: 'CHALLENGE'; player: number }
+  | { type: 'ACCEPT'; player: number }
 
 export type BotRequest = {
   id: number
@@ -31,6 +33,23 @@ export function chooseAction(state: RoundMemento, random = Math.random): BotActi
   if (player === undefined)
   {
     throw new Error('The round has ended')
+  }
+
+  if (state.wildDrawFourChallenge?.challenger === player)
+  {
+    const challenge = round.challengeWildDrawFour(player)
+
+    if (challenge)
+    {
+      return { type: 'CHALLENGE', player }
+    }
+
+    if (random() < 0.5)
+    {
+      return { type: 'CHALLENGE', player }
+    }
+
+    return { type: 'ACCEPT', player }
   }
 
   if (state.unoVulnerablePlayer !== undefined && state.unoVulnerablePlayer !== player && random() < 0.5)

@@ -28,9 +28,18 @@ async function run(action: () => Promise<void>): Promise<void>
   busy.value = true
   error.value = ''
 
-  try { await action() }
-  catch (problem) { error.value = problem instanceof Error ? problem.message : 'Something went wrong' }
-  finally { busy.value = false }
+  try
+  {
+    await action()
+  }
+  catch (problem)
+  {
+    error.value = problem instanceof Error ? problem.message : 'Something went wrong'
+  }
+  finally
+  {
+    busy.value = false
+  }
 }
 
 //#endregion
@@ -277,7 +286,8 @@ function play(index: number, color?: Color): void
       <GameBoard v-else-if="room.status === 'PLAYING' && room.board"
         :state="room.board" :busy="busy || !connected"
         @play="play" @draw="act({ type: 'DRAW' })" @pass="act({ type: 'PASS' })"
-        @uno="act({ type: 'UNO' })" @catch-uno="accused => act({ type: 'CATCH', accused })" />
+        @uno="act({ type: 'UNO' })" @catch-uno="accused => act({ type: 'CATCH', accused })"
+        @challenge="act({ type: 'CHALLENGE' })" @accept="act({ type: 'ACCEPT' })" />
 
       <template v-else-if="room.status === 'FINISHED'">
         <h2>Round over</h2>

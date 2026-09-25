@@ -203,14 +203,14 @@ describe("Legal plays", () => {
   })
 
   describe("legal plays with a wild draw 4 card", () => {
-    it("is illegal to play a wild draw 4 card if hand contains a card with matching color", () => {
+    it("can bluff by playing a wild draw 4 card with a matching color", () => {
       const shuffler = shuffleBuilder()
         .discard()
           .is({type: 'NUMBERED', color: 'GREEN'})
         .hand(0).is({type: 'WILD DRAW'}, {color: 'GREEN'})
         .build()
       const round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeFalsy()
+      expect(round.canPlay(0)).toBeTruthy()
     })
     it("is legal to play a wild draw 4 card if hand doesn't contain another playable card", () => {
       const shuffler = shuffleBuilder()
@@ -327,7 +327,7 @@ describe("Legal plays", () => {
       round.play(0, 'GREEN')
       expect(round.canPlay(0)).toBeTruthy()
     })
-    it("is illegal to play a wild draw 4 card if hand contains the selected color", () => {
+    it("can bluff with a wild draw 4 card when the selected color is in hand", () => {
       const shuffler = builder
         .hand(1)
           .is({type: 'WILD DRAW'})
@@ -335,7 +335,7 @@ describe("Legal plays", () => {
         .build()
       const round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
       round.play(0, 'GREEN')
-      expect(round.canPlay(0)).toBeFalsy()
+      expect(round.canPlay(0)).toBeTruthy()
     })
   })
 
