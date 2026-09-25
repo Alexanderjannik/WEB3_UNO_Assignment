@@ -1,23 +1,20 @@
-//#region Randomizer
-
+// A function that returns a (possibly) random number from 0 to bound - 1
 export type Randomizer = (bound: number) => number
 
+// Uniformly selected pseudo-random number
 export const standardRandomizer: Randomizer = n => Math.floor(Math.random() * n)
 
-//#endregion
+// A function that shuffles the given array
+export type Shuffler<T> = (ts: Readonly<T[]>) => T[]
 
-//#region Shuffler
-
-export type Shuffler<T> = (cards: T[]) => void
-
-export function standardShuffler<T>(cards: T[]) {
-  for(let i = 0; i < cards.length - 1; i++) {
-    const j = Math.floor(Math.random() * (cards.length - i) + i)
-    const temp = cards[j]
-    cards[j] = cards[i]
-    cards[i] = temp
+// Perfect shuffle using the Fisher-Yates method
+export function standardShuffler<T>(ts: Readonly<T[]>): T[] {
+  const shuffled = [...ts]
+  for(let i = 0; i < shuffled.length - 1; i++) {
+    const j = Math.floor(Math.random() * (shuffled.length - i) + i)
+    const temp = shuffled[j]
+    shuffled[j] = shuffled[i]
+    shuffled[i] = temp
   }
+  return shuffled
 }
-
-//#endregion
-

@@ -1,206 +1,157 @@
 import { describe, it, test, expect } from '@jest/globals'
-import { createGame, createGameFromMemento } from '../utils/test_adapter'
-import { Game, GameMemento } from '../../src/model/uno'
+import { createGame } from '../utils/test_adapter'
+import { shuffleBuilder, successiveShufflers } from '../utils/shuffling'
+import { Game, play } from '../../src/model/uno'
+import * as Round from '../../src/model/round'
+import * as _ from 'lodash'
 
 describe("Game set up", () => {
-  const game: Game = createGame({players: ['a', 'b', 'c', 'd'], targetScore: 500})
+  const game: Game = createGame({players: ['a', 'b', 'c', 'd'], targetScore: 200})
   it("has as many players as set in the properties", () => {
-    expect(game.playerCount).toBe(4)
+    expect(game.playerCount).toEqual(4)
   })
   it("has the players set in the properties", () => {
-    expect(game.player(0)).toBe('a')
-    expect(game.player(1)).toBe('b')
-    expect(game.player(2)).toBe('c')
-    expect(game.player(3)).toBe('d')
+    expect(game.players).toEqual(['a', 'b', 'c', 'd'])
   })
   it("has 'A' and 'B' as the default players", () => {
-    const game: Game = createGame({targetScore: 500})
-    expect(game.playerCount).toBe(2)
-    expect(game.player(0)).toBe('A')
-    expect(game.player(1)).toBe('B')
+    const game: Game = createGame({})
+    expect(game.playerCount).toEqual(2)
+    expect(game.players).toEqual(['A', 'B'])
   })
   it("has the target score set in the properties", () => {
-    expect(game.targetScore).toBe(500)
+    expect(game.targetScore).toEqual(200)
   })
   it("has 500 as the default target score", () => {
     const game: Game = createGame({players: ['a', 'b', 'c', 'd']})
-    expect(game.targetScore).toBe(500)
+    expect(game.targetScore).toEqual(500)
   })
   it("starts with all players at 0 score", () => {
-    expect(game.score(0)).toBe(0)
-    expect(game.score(1)).toBe(0)
-    expect(game.score(2)).toBe(0)
-    expect(game.score(3)).toBe(0)
+    expect(game.scores).toEqual([0, 0, 0, 0])
   })
   it("has no winner", () => {
-    expect(game.winner()).toBeUndefined();
+    expect(game.winner).toBeUndefined();
   })
   it("requires at least 2 players", () => {
-    expect(() => createGame({players: ['a'], targetScore: 500})).toThrow()
+    expect(() => createGame({players: ['a']})).toThrow()
   })
   it("requires a target score of more than 0", () => {
     expect(() => createGame({players: ['a', 'b', 'c', 'd'], targetScore: 0})).toThrow()
   })
-  it("requires player index to be in bounds", () => {
-    expect(() => game.player(-1)).toThrow()
-    expect(() => game.player(4)).toThrow()
-  })
   it("starts a round", () => {
-    expect(game.currentRound()).toBeDefined()
-  })
-  it("doesn't start a new round if no action is taken", () => {
-    const round = game.currentRound()
-    expect(game.currentRound()).toBe(round)
+    expect(game.currentRound).toBeDefined()
   })
   it("selects a random player as dealer", () => {
-    const game: Game = createGame({players: ['a', 'b', 'c', 'd'], targetScore: 500, randomizer: () => 1})
-    expect(game.currentRound()?.dealer).toBe(1)
+    const game: Game = createGame({players: ['a', 'b', 'c', 'd'], randomizer: () => 1})
+    expect(game.currentRound?.dealer).toEqual(1)
   })
 })
 
+const firstShuffle = shuffleBuilder({ players: 4, cardsPerPlayer: 1 })
+  .discard().is({ type: 'NUMBERED', color: 'BLUE', number: 8 })
+  .hand(0).is({ color: 'GREEN', type: 'DRAW' })
+  .hand(1).is({ number: 8 })
+  .hand(2).is({ type: 'WILD DRAW' })
+  .hand(3).is({ number: 3 })
+  .drawPile().is({ color: 'GREEN', number: 5 })
+  .build()
+
 describe("Playing a round", () => {
-  const memento: GameMemento = {
-    cardsPerPlayer: 1,
+  const props = {
     players: ['a', 'b', 'c', 'd'],
     targetScore: 200,
-    scores: [0, 0, 0, 0],
-    currentRound: {
-      players: ['a', 'b', 'c', 'd'],
-      hands: [
-        [{ color: 'GREEN', type: 'DRAW' }],
-        [{ color: 'BLUE', type: 'NUMBERED', number: 8 }],
-        [{ type: 'WILD DRAW' }],
-        [{ type: 'NUMBERED', color: 'YELLOW', number: 3}],
-      ],
-      drawPile: [{ type: 'NUMBERED', color: 'GREEN', number: 5 }, { type: 'WILD' }],
-      discardPile: [{ type: 'NUMBERED', color: 'BLUE', number: 8}],
-      currentColor: 'BLUE',
-      currentDirection: 'clockwise',
-      dealer: 3,
-      playerInTurn: 0
-    },
+    randomizer: () => 3,
+    shuffler: firstShuffle,
+    cardsPerPlayer: 1
   }
-  
+  const startGame = createGame(props)
   describe("while the round is still running", () => {
-    const game = createGameFromMemento(memento) 
-    const round = game.currentRound()!
-    round.draw()
+    const startingRound = startGame.currentRound!
+    const game = play(Round.draw, startGame)
     test("no winner has been found", () => {
-      expect(game.winner()).toBeUndefined()
+      expect(game.winner).toBeUndefined()
     })
     test("the score is unchanged", () => {
-      expect(game.score(0)).toBe(0)
-      expect(game.score(1)).toBe(0)
-      expect(game.score(2)).toBe(0)
-      expect(game.score(3)).toBe(0)
+      expect(game.scores).toEqual([0, 0, 0, 0])
     })
     test("the round is the same", () => {
-      expect(game.currentRound()).toBe(round)
+      expect(game.currentRound).toEqual(Round.draw(startingRound))
     })
   })
   describe("when the round is over", () => {
-    const game = createGameFromMemento(memento) 
-    const round = game.currentRound()!
-    round.draw()
-    round.play(0)
-    test("the setup is as expected", () => {
-      expect(round.hasEnded()).toBeTruthy()
-      expect(round.winner()).toEqual(1)
-      expect(round.score()).toEqual(78)
-    })
+    const game = play(_.flow([Round.draw, _.partial(Round.play, 0, undefined)]), startGame)
     test("the game still has no winner", () => {
-      expect(game.winner()).toBeUndefined()
+      expect(game.winner).toBeUndefined()
     })
     test("the score is updated", () => {
-      expect(game.score(0)).toBe(0)
-      expect(game.score(1)).toBe(78)
-      expect(game.score(2)).toBe(0)
-      expect(game.score(3)).toBe(0)
+      expect(game.scores).toEqual([0, 78, 0, 0])
     })
     test("a new round is started", () => {
-      expect(game.currentRound()).not.toBe(round)
+      expect(Round.hasEnded(game.currentRound!)).toBeFalsy
     })
   })
 })
 
+const secondShuffle = shuffleBuilder({ players: 4, cardsPerPlayer: 1 })
+  .discard().is({ type: 'NUMBERED', color: 'BLUE', number: 8 })
+  .hand(0).is({ color: 'YELLOW', number: 3 })
+  .hand(1).is({ color: 'GREEN', type: 'DRAW' })
+  .hand(2).is({ type: 'NUMBERED', color: 'BLUE', number: 8 })
+  .hand(3).is({ type: 'WILD DRAW' })
+  .drawPile().is({ type: 'NUMBERED', color: 'RED', number: 0})
+  .build()
+
 describe("ending the second round", () => {
-  const memento: GameMemento = {
-    cardsPerPlayer: 1,
+  const props = {
     players: ['a', 'b', 'c', 'd'],
     targetScore: 200,
-    scores: [0, 78, 0, 0],
-    currentRound: {
-      players: ['a', 'b', 'c', 'd'],
-      hands: [
-        [{ color: 'GREEN', type: 'NUMBERED', number: 8 }],
-        [{ color: 'BLUE', type: 'DRAW' }],
-        [{ type: 'WILD DRAW' }],
-        [{ type: 'NUMBERED', color: 'YELLOW', number: 3}],
-      ],
-      drawPile: [{ type: 'NUMBERED', color: 'GREEN', number: 5 }, { type: 'WILD' }],
-      discardPile: [{ type: 'NUMBERED', color: 'BLUE', number: 8}],
-      currentColor: 'BLUE',
-      currentDirection: 'clockwise',
-      dealer: 3,
-      playerInTurn: 0
-    },
+    randomizer: () => 3,
+    shuffler: successiveShufflers(firstShuffle, secondShuffle),
+    cardsPerPlayer: 1
   }
-  
-  const game = createGameFromMemento(memento)
-  const round2 = game.currentRound()!
-  round2.play(0)
+  const startGame = createGame(props)
+  const game1 = play(_.flow([Round.draw, _.partial(Round.play, 0, undefined)]), startGame)
+  const game2 = play(_.flow([Round.draw, _.partial(Round.play, 0, undefined)]), game1)
 
   test("the game still has no winner", () => {
-    expect(game.winner()).toBeUndefined()
+    expect(game2.winner).toBeUndefined()
   })
   test("the score is updated", () => {
-    expect(game.score(0)).toBe(73)
-    expect(game.score(1)).toBe(78)
-    expect(game.score(2)).toBe(0)
-    expect(game.score(3)).toBe(0)
+    expect(game2.scores).toEqual([ 0, 78, 73, 0 ])
   })
   test("a new round is started", () => {
-    expect(game.currentRound()).not.toBe(round2)
+    expect(Round.hasEnded(game2.currentRound!)).toBeFalsy
   })
 })
 
+const thirdShuffle = shuffleBuilder({ players: 4, cardsPerPlayer: 1 })
+  .discard().is({ type: 'NUMBERED', color: 'BLUE', number: 8 })
+  .hand(0).is({ color: 'BLUE', type: 'DRAW' })
+  .hand(1).is({ type: 'WILD DRAW' })
+  .hand(2).is({ type: 'SKIP', color: 'BLUE' })
+  .hand(3).is({ number: 3 })
+  .drawPile().is({ type: 'WILD' }, { type: 'REVERSE' })
+  .build()
+
 describe("ending the third round", () => {
-  const memento: GameMemento = {
-    cardsPerPlayer: 1,
+  const props = {
     players: ['a', 'b', 'c', 'd'],
-    targetScore: 200,
-    scores: [73, 78, 0, 0],
-    currentRound: {
-      players: ['a', 'b', 'c', 'd'],
-      hands: [
-        [{ color: 'BLUE', type: 'DRAW' }],
-        [{ type: 'WILD DRAW' }],
-        [{ color: 'GREEN', type: 'SKIP' }],
-        [{ type: 'NUMBERED', color: 'YELLOW', number: 3}],
-      ],
-      drawPile: [{ type: 'WILD' }, { type: 'REVERSE', color: 'RED' }],
-      discardPile: [{ type: 'NUMBERED', color: 'BLUE', number: 8}],
-      currentColor: 'BLUE',
-      currentDirection: 'clockwise',
-      dealer: 3,
-      playerInTurn: 0
-    },
+    targetScore: 140,
+    randomizer: () => 3,
+    shuffler: successiveShufflers(firstShuffle, secondShuffle, thirdShuffle),
+    cardsPerPlayer: 1
   }
-  
-  const game = createGameFromMemento(memento)
-  const round3 = game.currentRound()!
-  round3.play(0)
+  const startGame = createGame(props)
+  const game1 = play(_.flow([Round.draw, _.partial(Round.play, 0, undefined)]), startGame)
+  const game2 = play(_.flow([Round.draw, _.partial(Round.play, 0, undefined)]), game1)
+  const game3 = play(_.partial(Round.play, 0, undefined), game2)
 
   test("player 0 won", () => {
-    expect(game.winner()).toEqual(0)
+    expect(game3.winner).toEqual(2)
   })
   test("the score is updated", () => {
-    expect(game.score(0)).toBe(216)
-    expect(game.score(1)).toBe(78)
-    expect(game.score(2)).toBe(0)
-    expect(game.score(3)).toBe(0)
+    expect(game3.scores).toEqual([ 0, 78, 146, 0 ])
   })
   test("a new round is not started", () => {
-    expect(game.currentRound()).toBeUndefined()
+    expect(game3.currentRound).toBeUndefined()
   })
-})  
+})

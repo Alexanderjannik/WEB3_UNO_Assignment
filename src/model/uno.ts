@@ -1,18 +1,8 @@
 import { Card } from './deck'
-import { Round, RoundMemento, UnoRound } from './round'
-import {Randomizer, Shuffler, standardRandomizer, standardShuffler} from '../utils/random_utils'
+import { Round, createRound, hasEnded, score as roundScore, winner as roundWinner } from './round'
+import { Randomizer, Shuffler, standardRandomizer, standardShuffler } from '../utils/random_utils'
 
-//#region Types
-
-export type GameMemento = {
-  players: string[]
-  targetScore: number
-  scores: number[]
-  cardsPerPlayer: number
-  currentRound?: RoundMemento
-}
-
-export type GameConfig = {
+export type Props = {
   players?: string[]
   targetScore?: number
   randomizer?: Randomizer
@@ -20,234 +10,56 @@ export type GameConfig = {
   cardsPerPlayer?: number
 }
 
-//#endregion
-
-//#region Game interface
-
-export interface Game
-{
+export type Game = {
+  readonly players: readonly string[]
   readonly playerCount: number
   readonly targetScore: number
-
-  player(index: number): string
-  score(index: number): number
-  winner(): number | undefined
-  currentRound(): Round | undefined
-  toMemento(): GameMemento
+  readonly scores: readonly number[]
+  readonly winner?: number
+  readonly currentRound?: Round
+  readonly randomizer: Randomizer
+  readonly shuffler: Shuffler<Card>
+  readonly cardsPerPlayer: number
 }
 
-//#endregion
-
-//#region Game implementation
-
-export class UnoGame implements Game
+export function createGame({
+  players = ['A', 'B'],
+  targetScore = 500,
+  randomizer = standardRandomizer,
+  shuffler = standardShuffler,
+  cardsPerPlayer = 7
+}: Props = {}): Game
 {
-  private players: string[]
-  private scores: number[]
-  private round: UnoRound | undefined
-  private cardsPerPlayer: number
-
-  readonly targetScore: number
-
-  private constructor(state: GameMemento, private randomizer: Randomizer, private shuffler: Shuffler<Card>)
-  {
-    this.players = [...state.players]
-    this.targetScore = state.targetScore
-    this.scores = [...state.scores]
-    this.cardsPerPlayer = state.cardsPerPlayer
-
-    if (this.playerCount < 2 || this.playerCount > 10)
-    {
-      throw new Error('Use 2 to 10 players')
-    }
-
-    if (
-      !Number.isFinite(this.targetScore) ||
-      this.targetScore <= 0
-    )
-    {
-      throw new Error('Target score must be positive')
-    }
-
-    if (
-      this.scores.length !== this.playerCount ||
-      this.scores.some(score => !Number.isFinite(score) || score < 0)
-    )
-    {
-      throw new Error('Each player needs a nonnegative score')
-    }
-
-    if (
-      !Number.isInteger(this.cardsPerPlayer) ||
-      this.cardsPerPlayer < 1 ||
-      this.cardsPerPlayer * this.playerCount > 100
-    )
-    {
-      throw new Error('Invalid cards per player')
-    }
-
-    const winningScores = this.scores.filter(
-      score => score >= this.targetScore
-    )
-
-    if (winningScores.length > 1)
-    {
-      throw new Error('Only one game winner')
-    }
-
-    if (this.winner() === undefined)
-    {
-      if (!state.currentRound)
-      {
-        throw new Error('An unfinished game needs a round')
-      }
-
-      this.round = UnoRound.fromMemento(state.currentRound, shuffler)
-
-      if (
-        this.round.playerCount !== this.playerCount ||
-        this.players.some((name, i) => name !== this.round!.player(i))
-      )
-      {
-        throw new Error('Round players must match game players')
-      }
-
-      if (this.round.hasEnded())
-      {
-        throw new Error('Current round must still be active')
-      }
-
-      this.listenToRound(this.round)
-    }
-    else if (state.currentRound !== undefined)
-    {
-      throw new Error('A finished game cannot have an active round')
-    }
-  }
-
-  static create(
-    {
-      players = ['A', 'B'],
-      targetScore = 500,
-      randomizer = standardRandomizer,
-      shuffler = standardShuffler,
-      cardsPerPlayer = 7
-    }: GameConfig = {}
-  ): UnoGame
-  
-  {
-    const round = UnoRound.create({
-      players,
-      dealer: randomizer(players.length),
-      shuffler,
-      cardsPerPlayer
-    })
-
-    const initialState: GameMemento = {
-      players,
-      targetScore,
-      scores: players.map(() => 0),
-      cardsPerPlayer,
-      currentRound: round.toMemento()
-    }
-
-    return new UnoGame(initialState, randomizer, shuffler)
-  }
-
-  static fromMemento(
-    state: GameMemento,
-    randomizer = standardRandomizer,
-    shuffler: Shuffler<Card> = standardShuffler
-  ): UnoGame
-  {
-    return new UnoGame(state, randomizer, shuffler)
-  }
-
-  private listenToRound(round: UnoRound): void
-  {
-    round.onEnd(({ winner }) =>
-    {
-      this.scores[winner] += round.score()!
-
-      if (this.winner() !== undefined)
-      {
-        this.round = undefined
-      }
-      else
-      {
-        this.round = UnoRound.create({
-          players: this.players,
-          dealer: (round.dealer + 1) % this.playerCount,
-          cardsPerPlayer: this.cardsPerPlayer,
-          shuffler: this.shuffler
-        })
-
-        this.listenToRound(this.round)
-      }
-    })
-  }
-
-  private checkPlayer(index: number): void
-  {
-    if (
-      !Number.isInteger(index) ||
-      index < 0 ||
-      index >= this.playerCount
-    )
-    {
-      throw new Error('Invalid player index')
-    }
-  }
-
-  get playerCount(): number
-  {
-    return this.players.length
-  }
-
-  player(index: number): string
-  {
-    this.checkPlayer(index)
-
-    return this.players[index]
-  }
-
-  score(index: number): number
-  {
-    this.checkPlayer(index)
-
-    return this.scores[index]
-  }
-
-  winner(): number | undefined
-  {
-    const index = this.scores.findIndex(
-      score => score >= this.targetScore
-    )
-
-    return index === -1 ? undefined : index
-  }
-
-  currentRound(): Round | undefined
-  {
-    return this.round
-  }
-
-  toMemento(): GameMemento
-  {
-    const state: GameMemento = {
-      players: [...this.players],
-      targetScore: this.targetScore,
-      scores: [...this.scores],
-      cardsPerPlayer: this.cardsPerPlayer
-    }
-
-    if (this.round)
-    {
-      state.currentRound = this.round.toMemento()
-    }
-
-    return state
+  if (players.length < 2 || players.length > 10) throw new Error('Use 2 to 10 players')
+  if (!Number.isFinite(targetScore) || targetScore <= 0) throw new Error('Target score must be positive')
+  const dealer = randomizer(players.length)
+  if (!Number.isInteger(dealer) || dealer < 0 || dealer >= players.length) throw new Error('Invalid dealer')
+  const currentRound = createRound(players, dealer, shuffler, cardsPerPlayer)
+  return {
+    players: [...players],
+    playerCount: players.length,
+    targetScore,
+    scores: players.map(() => 0),
+    currentRound,
+    randomizer,
+    shuffler,
+    cardsPerPlayer
   }
 }
 
-//#endregion
+export function play(action: (round: Round) => Round, game: Game): Game
+{
+  if (!game.currentRound) throw new Error('The game has ended')
+  const currentRound = action(game.currentRound)
+  if (!hasEnded(currentRound)) return { ...game, currentRound }
+
+  const handWinner = roundWinner(currentRound)!
+  const points = roundScore(currentRound)!
+  const scores = game.scores.map((score, player) => player === handWinner ? score + points : score)
+  const winner = scores.findIndex(score => score >= game.targetScore)
+  if (winner !== -1) return { ...game, scores, winner, currentRound: undefined }
+
+  const nextDealer = (currentRound.dealer + 1) % game.playerCount
+  const nextRound = createRound(game.players as string[], nextDealer, game.shuffler, game.cardsPerPlayer)
+  return { ...game, scores, currentRound: nextRound }
+}

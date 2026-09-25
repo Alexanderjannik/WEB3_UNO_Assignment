@@ -1,796 +1,313 @@
-import { Card, CardDeck, Color, Deck, colors, hasColor } from './deck'
-import { PlayerHand } from './hand'
+import * as _ from 'lodash'
+import { Card, Color, cardPoints, colors, createInitialDeck, hasColor } from './deck'
 import { Shuffler, standardShuffler } from '../utils/random_utils'
 
-//#region Types
-
-export type RoundMemento = {
-  players: string[]
-  hands: Card[][]
-  drawPile: Card[]
-  discardPile: Card[]
-  currentColor: Color
-  currentDirection: 'clockwise' | 'counterclockwise'
-  dealer: number
-  playerInTurn?: number
-  drawnCardIndex?: number
-  unoDeclaredBy?: number
-  unoVulnerablePlayer?: number
-  wildDrawFourChallenge?: {
-    challenger: number
-    offender: number
-    previousColor: Color
-  }
-}
-
-export type RoundConfig = {
-  players: string[]
-  dealer: number
-  shuffler?: Shuffler<Card>
-  cardsPerPlayer?: number
-}
-
-export type RoundEnd = { winner: number }
-
-//#endregion
-
-//#region Round interface
-
-export interface Round {
+export type Round = {
+  readonly players: readonly string[]
   readonly playerCount: number
+  readonly hands: readonly (readonly Card[])[]
+  readonly drawPile: readonly Card[]
+  readonly discardPile: readonly Card[]
+  readonly currentColor: Color
+  readonly currentDirection: 'clockwise' | 'counterclockwise'
   readonly dealer: number
-  player(index: number): string
-  playerHand(index: number): readonly Card[]
-  playerInTurn(): number | undefined
-  drawPile(): Deck
-  discardPile(): Deck
-  canPlay(index: number): boolean
-  canPlayAny(): boolean
-  play(index: number, color?: Color): Card
-  draw(): void
-  pass(): void
-  sayUno(player: number): void
-  catchUnoFailure(players: { accuser: number; accused: number }): boolean
-  challengeWildDrawFour(player: number): boolean
-  acceptWildDrawFour(player: number): void
-  hasEnded(): boolean
-  winner(): number | undefined
-  score(): number | undefined
-  onEnd(callback: (event: RoundEnd) => void): void
-  toMemento(): RoundMemento
+  readonly playerInTurn?: number
+  readonly drawnCardIndex?: number
+  readonly unoDeclaredBy?: number
+  readonly unoVulnerablePlayer?: number
+  readonly wildDrawFourChallenge?: {
+    readonly challenger: number
+    readonly offender: number
+    readonly previousColor: Color
+  }
+  readonly shuffler: Shuffler<Card>
 }
 
-//#endregion
-
-//#region Round implementation
-
-export class UnoRound implements Round {
-  //#region Fields and constructor
-
-  private players: string[]
-  private hands: PlayerHand[]
-  private drawCards: CardDeck
-  private discardedCards: CardDeck
-  private currentColor: Color
-  private direction: number
-  private turn: number | undefined
-  private drawnCardIndex: number | undefined
-  private unoDeclaredBy: number | undefined
-  private unoVulnerablePlayer: number | undefined
-  private wildDrawFourChallenge: RoundMemento['wildDrawFourChallenge']
-  private endCallbacks: ((event: RoundEnd) => void)[] = []
-  readonly dealer: number
-
-  private constructor(
-  state: RoundMemento,
-  private shuffler: Shuffler<Card>
-)
+export function createRound(
+  players: string[],
+  dealer: number,
+  shuffler: Shuffler<Card> = standardShuffler,
+  cardsPerPlayer = 7
+): Round
 {
-  this.players = [...state.players]
-
-  if (this.players.length < 2 || this.players.length > 10)
-  {
-    throw new Error('Use 2 to 10 players')
-  }
-
-  this.checkPlayer(state.dealer)
-  this.dealer = state.dealer
-
-  if (state.hands.length !== this.playerCount)
-  {
-    throw new Error('Each player needs a hand')
-  }
-
-  this.hands = state.hands.map(cards =>
-  {
-    const validatedDeck = CardDeck.fromMemento(cards)
-    const validatedCards = validatedDeck.toMemento()
-
-    return new PlayerHand(validatedCards)
-  })
-
-  const emptyHands = this.hands.filter(hand => hand.size === 0)
-
-  if (emptyHands.length > 1)
-  {
-    throw new Error('Only one player can win')
-  }
-
-  this.drawCards = CardDeck.fromMemento(state.drawPile)
-  this.discardedCards = CardDeck.fromMemento(state.discardPile)
-
-  const top = this.discardedCards.top()
-
-  if (!top)
-  {
-    throw new Error('The discard pile cannot be empty')
-  }
-
-  if (!colors.includes(state.currentColor))
-  {
-    throw new Error('Invalid current color')
-  }
-
-  if ('color' in top && top.color !== state.currentColor)
-  {
-    throw new Error('Color must match the top card')
-  }
-
-  this.currentColor = state.currentColor
-
-  if (state.currentDirection !== 'clockwise' && state.currentDirection !== 'counterclockwise')
-  {
-    throw new Error('Invalid direction')
-  }
-
-  this.direction = state.currentDirection === 'clockwise' ? 1 : -1
-
-  this.wildDrawFourChallenge = state.wildDrawFourChallenge
-
-  if (this.wildDrawFourChallenge)
-  {
-    this.checkPlayer(this.wildDrawFourChallenge.challenger)
-    this.checkPlayer(this.wildDrawFourChallenge.offender)
-
-    if (
-      this.wildDrawFourChallenge.challenger === this.wildDrawFourChallenge.offender ||
-      !colors.includes(this.wildDrawFourChallenge.previousColor) ||
-      state.playerInTurn !== this.wildDrawFourChallenge.challenger
-    )
-    {
-      throw new Error('Invalid Wild Draw Four challenge')
-    }
-  }
-
-  const roundHasEnded = this.hasEnded()
-
-  this.turn = roundHasEnded ? undefined : state.playerInTurn
-
-  if (!roundHasEnded)
-  {
-    if (this.turn === undefined)
-    {
-      throw new Error('An active round needs a player in turn')
-    }
-
-    this.checkPlayer(this.turn)
-  }
-
-  this.drawnCardIndex = state.drawnCardIndex
-  this.unoDeclaredBy = state.unoDeclaredBy
-  this.unoVulnerablePlayer = state.unoVulnerablePlayer
-
-  if (this.drawnCardIndex !== undefined)
-  {
-    if (this.turn === undefined)
-    {
-      throw new Error('Invalid drawn card index')
-    }
-
-    const lastCardIndex = this.hands[this.turn].size - 1
-
-    if (this.drawnCardIndex !== lastCardIndex)
-    {
-      throw new Error('Invalid drawn card index')
-    }
-  }
-
-  if (this.unoDeclaredBy !== undefined)
-  {
-    this.checkPlayer(this.unoDeclaredBy)
-  }
-
-  if (this.unoVulnerablePlayer !== undefined)
-  {
-    this.checkPlayer(this.unoVulnerablePlayer)
-  }
-}
-
-  //#endregion
-
-  //#region Round creation
-
-  static create({players, dealer, shuffler = standardShuffler, cardsPerPlayer = 7}: RoundConfig): UnoRound
-{
-  if (players.length < 2 || players.length > 10)
-  {
-    throw new Error('Use 2 to 10 players')
-  }
-
-  if (!Number.isInteger(dealer) || dealer < 0 ||dealer >= players.length)
-  {
-    throw new Error('Invalid dealer')
-  }
-
+  if (players.length < 2 || players.length > 10) throw new Error('Use 2 to 10 players')
+  if (!Number.isInteger(dealer) || dealer < 0 || dealer >= players.length) throw new Error('Invalid dealer')
   if (!Number.isInteger(cardsPerPlayer) || cardsPerPlayer < 1 || players.length * cardsPerPlayer > 100)
   {
     throw new Error('Invalid number of cards per player')
   }
 
-  const deck = CardDeck.full()
-
-  deck.shuffle(shuffler)
-
+  let deck = shuffler(createInitialDeck())
   const hands: Card[][] = []
-
   for (let player = 0; player < players.length; player++)
   {
-    const hand: Card[] = []
-
-    for (let i = 0; i < cardsPerPlayer; i++)
-    {
-      const card = deck.deal()!
-
-      hand.push(card)
-    }
-
-    hands.push(hand)
+    hands.push(deck.slice(0, cardsPerPlayer))
+    deck = deck.slice(cardsPerPlayer)
   }
 
-  let top = deck.deal()!
-
-  while (!('color' in top))
+  let top = deck[0]
+  while (top && !('color' in top))
   {
-    deck.add(top)
-    deck.shuffle(shuffler)
-
-    top = deck.deal()!
+    deck = shuffler([...deck.slice(1), top])
+    top = deck[0]
   }
+  if (!top || !('color' in top)) throw new Error('Could not select a starting card')
+  deck = deck.slice(1)
 
-  const initialState: RoundMemento = {
-    players,
+  let round: Round = {
+    players: [...players],
+    playerCount: players.length,
     hands,
-    dealer,
-    drawPile: deck.toMemento(),
+    drawPile: deck,
     discardPile: [top],
     currentColor: top.color,
     currentDirection: 'clockwise',
-    playerInTurn: (dealer + 1) % players.length
+    dealer,
+    playerInTurn: (dealer + 1) % players.length,
+    shuffler
   }
-
-  const round = new UnoRound(initialState, shuffler)
 
   if (top.type === 'REVERSE')
   {
-    round.direction = -1
-
-    round.turn = dealer
+    const reversed = { ...round, currentDirection: 'counterclockwise' as const }
+    round = {
+      ...reversed,
+      playerInTurn: players.length === 2 ? dealer : nextPlayer(reversed, dealer)
+    }
   }
-
   else if (top.type === 'SKIP')
-
   {
-    round.turn = round.nextPlayer(round.turn!)
+    round = { ...round, playerInTurn: nextPlayer(round, round.playerInTurn!) }
   }
-
   else if (top.type === 'DRAW')
-
   {
-    round.giveCards(round.turn!, 2)
-
-    round.turn = round.nextPlayer(round.turn!)
+    round = giveCards(round, round.playerInTurn!, 2)
+    round = { ...round, playerInTurn: nextPlayer(round, round.playerInTurn!) }
   }
 
   return round
 }
 
-  static fromMemento(state: RoundMemento, shuffler: Shuffler<Card> = standardShuffler): UnoRound
+function checkPlayer(round: Round, player: number): void
 {
-  return new UnoRound(state, shuffler)
+  if (!Number.isInteger(player) || player < 0 || player >= round.players.length) throw new Error('Invalid player index')
 }
 
-//#endregion
-
-//#region Players and round state
-
-get playerCount(): number
+function activePlayer(round: Round): number
 {
-  return this.players.length
+  if (round.playerInTurn === undefined) throw new Error('The round has ended')
+  return round.playerInTurn
 }
 
-private checkPlayer(index: number): void
+function nextPlayer(round: Round, player: number, steps = 1): number
 {
-  if (
-    !Number.isInteger(index) ||
-    index < 0 ||
-    index >= this.playerCount
-  )
+  const direction = round.currentDirection === 'clockwise' ? 1 : -1
+  return (player + direction * steps + round.players.length) % round.players.length
+}
+
+export function topOfDiscard(round: Round): Card
+{
+  const top = round.discardPile[0]
+  if (!top) throw new Error('The discard pile is empty')
+  return top
+}
+
+export function hasEnded(round: Round): boolean
+{
+  return winner(round) !== undefined
+}
+
+export function winner(round: Round): number | undefined
+{
+  if (round.wildDrawFourChallenge) return undefined
+  const index = round.hands.findIndex(hand => hand.length === 0)
+  return index === -1 ? undefined : index
+}
+
+export function score(round: Round): number | undefined
+{
+  const winningPlayer = winner(round)
+  if (winningPlayer === undefined) return undefined
+  return _.sumBy(round.hands.filter((_, index) => index !== winningPlayer), hand => _.sumBy(hand, cardPoints))
+}
+
+export function canPlay(index: number, round: Round): boolean
+{
+  if (round.playerInTurn === undefined || !Number.isInteger(index) || round.wildDrawFourChallenge) return false
+  const hand = round.hands[round.playerInTurn]
+  const card = hand[index]
+  if (!card || (round.drawnCardIndex !== undefined && index !== round.drawnCardIndex)) return false
+  if (card.type === 'WILD') return true
+  if (card.type === 'WILD DRAW') return true
+  if (card.color === round.currentColor) return true
+
+  const top = topOfDiscard(round)
+  return card.type === 'NUMBERED'
+    ? top.type === 'NUMBERED' && card.number === top.number
+    : card.type === top.type
+}
+
+export function canPlayAny(round: Round): boolean
+{
+  if (round.playerInTurn === undefined) return false
+  return round.hands[round.playerInTurn].some((_, index) => canPlay(index, round))
+}
+
+function refillDrawPile(round: Round): Pick<Round, 'drawPile' | 'discardPile'>
+{
+  if (round.drawPile.length > 0 || round.discardPile.length <= 1)
   {
-    throw new Error('Invalid player index')
+    return { drawPile: round.drawPile, discardPile: round.discardPile }
   }
+  const [top, ...rest] = round.discardPile
+  return { drawPile: round.shuffler(rest), discardPile: [top] }
 }
 
-private activePlayer(): number
+function giveCards(round: Round, player: number, count: number): Round
 {
-  if (this.turn === undefined)
+  let next = round
+  for (let i = 0; i < count; i++)
   {
-    throw new Error('The round has ended')
+    const piles = refillDrawPile(next)
+    const card = piles.drawPile[0]
+    if (!card) break
+    const hands = next.hands.map((hand, index) => index === player ? [...hand, card] : hand)
+    next = { ...next, ...piles, drawPile: piles.drawPile.slice(1), hands }
+    const refilled = refillDrawPile(next)
+    next = { ...next, ...refilled }
   }
-
-  return this.turn
+  return next
 }
 
-private nextPlayer(from: number, steps = 1): number
+export function play(index: number, color: Color | undefined, round: Round): Round
 {
-  return (from + this.direction * steps + this.playerCount) % this.playerCount
-}
-
-player(index: number): string
-{
-  this.checkPlayer(index)
-
-  return this.players[index]
-}
-
-playerHand(index: number): readonly Card[]
-{
-  this.checkPlayer(index)
-
-  return this.hands[index].cards
-}
-
-playerInTurn(): number | undefined
-{
-  return this.turn
-}
-
-drawPile(): Deck
-{
-  return this.drawCards
-}
-
-discardPile(): Deck
-{
-  return this.discardedCards
-}
-
-  winner(): number | undefined
-  {
-    if (this.wildDrawFourChallenge)
-    {
-      return undefined
-    }
-
-    const winner = this.hands.findIndex(hand => hand.size === 0)
-
-  return winner === -1 ? undefined : winner
-}
-
-hasEnded(): boolean
-{
-  return this.winner() !== undefined
-}
-
-score(): number | undefined
-{
-  if (!this.hasEnded())
-  {
-    return undefined
-  }
-
-  return this.hands.reduce((total, hand) => total + hand.score(), 0)
-}
-
-//#endregion
-
-//#region Playing cards
-
- canPlay(index: number): boolean
-{
-  if (this.turn === undefined || !Number.isInteger(index))
-  {
-    return false
-  }
-
-  if (this.wildDrawFourChallenge)
-  {
-    return false
-  }
-
-  const hand = this.hands[this.turn]
-  const card = hand.cards[index]
-
-  if (!card)
-  {
-    return false
-  }
-
-  if (
-    this.drawnCardIndex !== undefined &&
-    index !== this.drawnCardIndex
-  )
-  {
-    return false
-  }
-
-  if (card.type === 'WILD' || card.type === 'WILD DRAW')
-  {
-    return true
-  }
-
-  if (card.color === this.currentColor)
-  {
-    return true
-  }
-
-  const top = this.discardedCards.top()!
-
-  if (card.type === 'NUMBERED')
-  {
-    return top.type === 'NUMBERED' && card.number === top.number
-  }
-
-  return card.type === top.type
-}
-
-canPlayAny(): boolean
-{
-  if (this.turn === undefined)
-  {
-    return false
-  }
-
-  const hand = this.hands[this.turn]
-
-  return hand.cards.some((card, index) => this.canPlay(index))
-}
-
-play(index: number, color?: Color): Card
-{
-  const player = this.activePlayer()
-
-  if (this.wildDrawFourChallenge)
-  {
-    throw new Error('Accept or challenge the Wild Draw Four first')
-  }
-
-  if (!this.canPlay(index))
-  {
-    throw new Error('That card cannot be played')
-  }
-
-  const card = this.hands[player].cards[index]
-  const previousColor = this.currentColor
+  const player = activePlayer(round)
+  if (round.wildDrawFourChallenge) throw new Error('Accept or challenge the Wild Draw Four first')
+  if (!canPlay(index, round)) throw new Error('That card cannot be played')
+  const card = round.hands[player][index]
 
   if ('color' in card)
   {
-    if (color !== undefined)
-    {
-      throw new Error('Choose a color only for wild cards')
-    }
+    if (color !== undefined) throw new Error('Choose a color only for wild cards')
   }
-  else if (color === undefined || !colors.includes(color))
+  else if (!color || !colors.includes(color))
   {
     throw new Error('Choose a valid color for the wild card')
   }
 
-  this.unoVulnerablePlayer = undefined
-
-  const saidUno = this.unoDeclaredBy === player
-
-  this.unoDeclaredBy = undefined
-  this.drawnCardIndex = undefined
-
-  this.hands[player].remove(index)
-  this.discardedCards.add(card)
-
-  this.currentColor = 'color' in card ? card.color : color!
-
-  if (this.hands[player].size === 1 && !saidUno)
-  {
-    this.unoVulnerablePlayer = player
+  const saidUno = round.unoDeclaredBy === player
+  const hands = round.hands.map((hand, playerIndex) => playerIndex === player ? hand.filter((_, cardIndex) => cardIndex !== index) : hand)
+  const currentColor = 'color' in card ? card.color : color!
+  const previousColor = round.currentColor
+  const unoVulnerablePlayer = hands[player].length === 1 && !saidUno ? player : undefined
+  const afterDiscard: Round = {
+    ...round,
+    hands,
+    discardPile: [card, ...round.discardPile],
+    currentColor,
+    drawnCardIndex: undefined,
+    unoDeclaredBy: undefined,
+    unoVulnerablePlayer
   }
 
-  let steps = 1
-
-  if (card.type === 'REVERSE')
+  if (card.type === 'WILD DRAW')
   {
-    this.direction *= -1
-
-    if (this.playerCount === 2)
-    {
-      steps = 2
+    return {
+      ...afterDiscard,
+      playerInTurn: nextPlayer(afterDiscard, player),
+      wildDrawFourChallenge: { challenger: nextPlayer(afterDiscard, player), offender: player, previousColor }
     }
   }
 
-  if (card.type === 'SKIP')
+  let next = afterDiscard
+  let steps = 1
+  if (card.type === 'REVERSE')
   {
+    next = { ...next, currentDirection: round.currentDirection === 'clockwise' ? 'counterclockwise' : 'clockwise' }
+    if (round.players.length === 2) steps = 2
+  }
+  if (card.type === 'SKIP') steps = 2
+  if (card.type === 'DRAW')
+  {
+    next = giveCards(next, nextPlayer(next, player), 2)
     steps = 2
   }
 
-  if (card.type === 'DRAW' || card.type === 'WILD DRAW')
-  {
-    const nextPlayer = this.nextPlayer(player)
-
-    if (card.type === 'DRAW')
-    {
-      this.giveCards(nextPlayer, 2)
-      steps = 2
-    }
-    else
-    {
-      this.wildDrawFourChallenge = {
-        challenger: nextPlayer,
-        offender: player,
-        previousColor
-      }
-      steps = 1
-    }
-
-  }
-
-  this.turn = this.nextPlayer(player, steps)
-  this.endIfNeeded()
-
-  return card
+  next = { ...next, playerInTurn: nextPlayer(next, player, steps) }
+  return winner(next) === undefined ? next : { ...next, playerInTurn: undefined, unoVulnerablePlayer: undefined }
 }
 
-//#endregion
-
-//#region Drawing cards
-
-  private refillDrawPile(): void
+export function draw(round: Round): Round
 {
-  if (this.drawCards.size > 0 || this.discardedCards.size <= 1)
+  const player = activePlayer(round)
+  if (round.wildDrawFourChallenge) throw new Error('Accept or challenge the Wild Draw Four first')
+  if (round.drawnCardIndex !== undefined) throw new Error('Play the drawn card or pass')
+  let next: Round = { ...round, unoVulnerablePlayer: undefined, unoDeclaredBy: undefined }
+  const previousSize = round.hands[player].length
+  next = giveCards(next, player, 1)
+  if (next.hands[player].length > previousSize)
   {
-    return
+    const drawnCardIndex = previousSize
+    next = { ...next, drawnCardIndex }
+    if (canPlay(drawnCardIndex, next)) return next
   }
-
-  const top = this.discardedCards.deal()!
-
-  this.drawCards = new CardDeck(this.discardedCards.toMemento())
-  this.drawCards.shuffle(this.shuffler)
-
-  this.discardedCards = new CardDeck([top])
+  return { ...next, drawnCardIndex: undefined, playerInTurn: nextPlayer(next, player) }
 }
 
-private giveCards(player: number, count: number): void
+export function pass(round: Round): Round
 {
-  for (let i = 0; i < count; i++)
-  {
-    this.refillDrawPile()
-
-    const card = this.drawCards.deal()
-
-    if (!card)
-    {
-      break
-    }
-
-    this.hands[player].add(card)
-
-    this.refillDrawPile()
-  }
+  const player = activePlayer(round)
+  if (round.drawnCardIndex === undefined) throw new Error('Draw before passing')
+  return { ...round, drawnCardIndex: undefined, unoDeclaredBy: undefined, unoVulnerablePlayer: undefined, playerInTurn: nextPlayer(round, player) }
 }
 
-draw(): void
+export function sayUno(player: number, round: Round): Round
 {
-  const player = this.activePlayer()
-
-  if (this.wildDrawFourChallenge)
-  {
-    throw new Error('Accept or challenge the Wild Draw Four first')
-  }
-
-  if (this.drawnCardIndex !== undefined)
-  {
-    throw new Error('Play the drawn card or pass')
-  }
-
-  this.unoVulnerablePlayer = undefined
-  this.unoDeclaredBy = undefined
-
-  const previousSize = this.hands[player].size
-
-  this.giveCards(player, 1)
-
-  if (this.hands[player].size > previousSize)
-  {
-    this.drawnCardIndex = previousSize
-
-    if (this.canPlay(previousSize))
-    {
-      return
-    }
-  }
-
-  this.drawnCardIndex = undefined
-  this.turn = this.nextPlayer(player)
+  activePlayer(round)
+  checkPlayer(round, player)
+  const unoVulnerablePlayer = round.unoVulnerablePlayer === player ? undefined : round.unoVulnerablePlayer
+  const unoDeclaredBy = round.playerInTurn === player && round.hands[player].length === 2 ? player : round.unoDeclaredBy
+  return { ...round, unoDeclaredBy, unoVulnerablePlayer }
 }
 
-pass(): void
+export function checkUnoFailure({ accuser, accused }: { accuser: number; accused: number }, round: Round): boolean
 {
-  const player = this.activePlayer()
-
-  if (this.wildDrawFourChallenge)
-  {
-    throw new Error('Accept or challenge the Wild Draw Four first')
-  }
-
-  if (this.drawnCardIndex === undefined)
-  {
-    throw new Error('Draw before passing')
-  }
-
-  this.drawnCardIndex = undefined
-  this.unoDeclaredBy = undefined
-  this.unoVulnerablePlayer = undefined
-
-  this.turn = this.nextPlayer(player)
+  activePlayer(round)
+  checkPlayer(round, accuser)
+  checkPlayer(round, accused)
+  return accuser !== accused && round.unoVulnerablePlayer === accused
 }
 
-//#endregion
-
-//#region UNO
-
-sayUno(player: number): void
+export function catchUnoFailure({ accuser, accused }: { accuser: number; accused: number }, round: Round): Round
 {
-  this.activePlayer()
-  this.checkPlayer(player)
-
-  if (this.unoVulnerablePlayer === player)
-  {
-    this.unoVulnerablePlayer = undefined
-  }
-
-  if (this.turn === player && this.hands[player].size === 2)
-  {
-    this.unoDeclaredBy = player
-  }
+  if (!checkUnoFailure({ accuser, accused }, round)) return round
+  return { ...giveCards(round, accused, 4), unoVulnerablePlayer: undefined }
 }
 
-catchUnoFailure(
-  { accuser, accused }: { accuser: number; accused: number }
-): boolean
+export function challengeWildDrawFour(player: number, round: Round): Round
 {
-  this.activePlayer()
-
-  this.checkPlayer(accuser)
-  this.checkPlayer(accused)
-
-  if (accuser === accused || this.unoVulnerablePlayer !== accused)
+  const challenge = round.wildDrawFourChallenge
+  if (!challenge || player !== challenge.challenger) throw new Error('Only the next player can challenge the Wild Draw Four')
+  const offenderHasColor = round.hands[challenge.offender].some(card => hasColor(card, challenge.previousColor))
+  let next: Round = { ...round, wildDrawFourChallenge: undefined, unoVulnerablePlayer: undefined }
+  if (offenderHasColor)
   {
-    return false
-  }
-
-  this.giveCards(accused, 4)
-
-  this.unoVulnerablePlayer = undefined
-
-  return true
-}
-
-challengeWildDrawFour(player: number): boolean
-{
-  const challenge = this.wildDrawFourChallenge
-
-  if (!challenge || player !== challenge.challenger)
-  {
-    throw new Error('Only the next player can challenge the Wild Draw Four')
-  }
-
-  const offenderHasMatchingColor = this.hands[challenge.offender].cards.some(
-    card => hasColor(card, challenge.previousColor)
-  )
-
-  this.wildDrawFourChallenge = undefined
-  this.unoVulnerablePlayer = undefined
-
-  if (offenderHasMatchingColor)
-  {
-    this.giveCards(challenge.offender, 4)
-    this.turn = challenge.challenger
+    next = giveCards(next, challenge.offender, 4)
+    next = { ...next, playerInTurn: challenge.challenger }
   }
   else
   {
-    this.giveCards(challenge.challenger, 6)
-    this.turn = this.nextPlayer(challenge.challenger)
+    next = giveCards(next, challenge.challenger, 6)
+    next = { ...next, playerInTurn: nextPlayer(next, challenge.challenger) }
   }
-
-  this.endIfNeeded()
-  return offenderHasMatchingColor
+  return winner(next) === undefined ? next : { ...next, playerInTurn: undefined }
 }
 
-acceptWildDrawFour(player: number): void
+export function acceptWildDrawFour(player: number, round: Round): Round
 {
-  const challenge = this.wildDrawFourChallenge
-
-  if (!challenge || player !== challenge.challenger)
-  {
-    throw new Error('Only the next player can accept the Wild Draw Four')
-  }
-
-  this.wildDrawFourChallenge = undefined
-  this.unoVulnerablePlayer = undefined
-  this.giveCards(challenge.challenger, 4)
-  this.turn = this.nextPlayer(challenge.challenger)
-  this.endIfNeeded()
+  const challenge = round.wildDrawFourChallenge
+  if (!challenge || player !== challenge.challenger) throw new Error('Only the next player can accept the Wild Draw Four')
+  const next = giveCards({ ...round, wildDrawFourChallenge: undefined, unoVulnerablePlayer: undefined }, player, 4)
+  const result = { ...next, playerInTurn: nextPlayer(next, player) }
+  return winner(result) === undefined ? result : { ...result, playerInTurn: undefined }
 }
-
-private endIfNeeded(): void
-{
-  const winner = this.winner()
-
-  if (winner === undefined)
-  {
-    return
-  }
-
-  this.turn = undefined
-  this.unoVulnerablePlayer = undefined
-
-  for (const callback of this.endCallbacks)
-  {
-    callback({ winner })
-  }
-}
-
-//#endregion
-
-//#region Round events and memento
-
-onEnd(callback: (event: RoundEnd) => void): void
-{
-  this.endCallbacks.push(callback)
-}
-
-    toMemento(): RoundMemento
-  {
-    const state: RoundMemento = {
-      players: [...this.players],
-      hands: this.hands.map(hand => hand.toMemento()),
-      drawPile: this.drawCards.toMemento(),
-      discardPile: this.discardedCards.toMemento(),
-      currentColor: this.currentColor,
-      currentDirection: this.direction === 1 ? 'clockwise' : 'counterclockwise',
-      dealer: this.dealer,
-      playerInTurn: this.turn
-    }
-
-    if (this.drawnCardIndex !== undefined)
-    {
-      state.drawnCardIndex = this.drawnCardIndex
-    }
-
-    if (this.unoDeclaredBy !== undefined)
-    {
-      state.unoDeclaredBy = this.unoDeclaredBy
-    }
-
-    if (this.unoVulnerablePlayer !== undefined)
-    {
-      state.unoVulnerablePlayer = this.unoVulnerablePlayer
-    }
-
-    if (this.wildDrawFourChallenge)
-    {
-      state.wildDrawFourChallenge = { ...this.wildDrawFourChallenge }
-    }
-
-    return state
-  }
-
-  //#endregion
-}
-
-//#endregion

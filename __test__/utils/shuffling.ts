@@ -1,56 +1,42 @@
 import { Card } from "../../src/model/deck"
-import { Round } from "../../src/model/round"
 import { Shuffler, standardShuffler } from "../../src/utils/random_utils"
-import { CardPredicate, CardSpec, is, not } from "./predicates"
-import { HandConfig, createRound } from "./test_adapter"
+import { CardPredicate, CardSpec, is } from "./predicates"
+import * as _ from 'lodash'
 
-function constrainedShuffler(...constraints: [number, CardPredicate][]): Shuffler<Card> {
-  return (cards: Card[]) => {
+export const deterministicShuffle = (cards: Card[]): Shuffler<Card> => _ => cards
+
+export function successiveShufflers(...shufflers: Shuffler<Card>[]): Shuffler<Card> {
+  shufflers.reverse()
+  let shuffler = shufflers.pop() ?? standardShuffler
+  return (cards: readonly Card[]) => {
+    let shuffled = shuffler(cards)
+    shuffler = shufflers.pop() ?? shuffler
+    return shuffled
+  }
+}
+
+export const noShuffle: Shuffler<Card> = cs => [...cs]
+
+
+export function constrainedShuffler(...constraints: [number, CardPredicate][]): Shuffler<Card> {
+  return (cards: readonly Card[]) => {
+    const cs = [...cards]
     constraints.sort(([a, _], [b, __]) => a - b)
-    standardShuffler(cards)
+    standardShuffler(cs)
     let foundCards: Card[] = []
     for(let i = 0; i < constraints.length; i++) {
       let [_, predicate] = constraints[i]
-      const foundIndex = cards.findIndex(predicate)
+      const foundIndex = cs.findIndex(predicate)
       if (foundIndex === -1) throw new Error('Unsatisfiable predicate')
-      foundCards.push(cards[foundIndex])    
-      cards.splice(foundIndex, 1)
-    }  
+      foundCards.push(cs[foundIndex])
+      cs.splice(foundIndex, 1)
+    }
     for(let i = 0; i < constraints.length; i++) {
       let [index] = constraints[i]
-      cards.splice(index, 0, foundCards[i])
-    }  
-  }  
-}
-
-export function memoizingShuffler(shuffler: Shuffler<Card>): {readonly shuffler: Shuffler<Card>, readonly memo: Readonly<Card[]>} {
-  let memo: Card[] = []
-  function shuffle(cards: Card[]): void {
-    shuffler(cards)
-    memo = [...cards]
+      cs.splice(index, 0, foundCards[i])
+    }
+    return cs
   }
-  return {shuffler: shuffle, get memo() {return memo}}
-}
-
-export function successiveShufflers(...shufflers: Shuffler<Card>[]): Shuffler<Card> {
-  shufflers.push(standardShuffler)
-  let index = 0
-  let shuffler = shufflers[index]
-  return (cards: Card[]) => {
-    shuffler(cards)
-    if (index < shufflers.length - 1) index++
-    shuffler = shufflers[index]
-  }  
-}
-
-export function createRoundWithShuffledCards(props: Partial<HandConfig>): [Round, Readonly<Card[]>] {
-  const shuffler = props.shuffler ?? standardShuffler
-  let memoShuffler = memoizingShuffler(shuffler)
-  const hand = createRound({
-    players: props.players ?? ['a', 'b', 'c', 'd'], 
-    dealer: props.dealer ?? 1, 
-    shuffler: memoShuffler.shuffler})
-  return [hand, memoShuffler.memo]
 }
 
 export type ShuffleBuilder = {
@@ -111,7 +97,7 @@ export function shuffleBuilder(
       return constrain(specs.map(is))
     },
     isnt(...specs: CardSpec[]) {
-      return constrain(specs.map(spec => not(is(spec))))
+      return constrain(specs.map(spec => _.negate(is(spec))))
     },
     build: () => constrainedShuffler(...constraints.entries())
   }

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from '@jest/globals'
 import { createRound} from '../utils/test_adapter'
-import { Round } from '../../src/model/round'
+import { canPlay, Round, play } from '../../src/model/round'
 import { shuffleBuilder } from '../utils/shuffling'
 
 describe("Legal plays", () => {
@@ -12,52 +12,52 @@ describe("Legal plays", () => {
     it("is legal to play a numbered card in the same color as the top card", () => {
       const shuffler = builder.hand(0).is({type: 'NUMBERED', color: 'BLUE', number: 3}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeTruthy()
+      expect(canPlay(0, round)).toBeTruthy()
     })
     it("is not legal to play a card with different number and color than the top card", () => {
       const shuffler = builder.hand(0).is({type: 'NUMBERED', color: 'RED', number: 3}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeFalsy()
+      expect(canPlay(0, round)).toBeFalsy()
     })
     it("is legal to play a card with the same number as the top card", () => {
       const shuffler = builder.hand(0).is({type: 'NUMBERED', color: 'RED', number: 6}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeTruthy()
+      expect(canPlay(0, round)).toBeTruthy()
     })
     it("is legal to play a reverse card in the same color as the top card", () => {
       const shuffler = builder.hand(0).is({type: 'REVERSE', color: 'BLUE'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeTruthy()
+      expect(canPlay(0, round)).toBeTruthy()
     })
     it("is not legal to play a reverse card in a different color as the top card", () => {
       const shuffler = builder.hand(0).is({type: 'REVERSE', color: 'RED'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeFalsy()
+      expect(canPlay(0, round)).toBeFalsy()
     })
     it("is legal to play a skip card in the same color as the top card", () => {
       const shuffler = builder.hand(0).is({type: 'SKIP', color: 'BLUE'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeTruthy()
+      expect(canPlay(0, round)).toBeTruthy()
     })
     it("is not legal to play a skip card in a different color as the top card", () => {
       const shuffler = builder.hand(0).is({type: 'SKIP', color: 'RED'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeFalsy()
+      expect(canPlay(0, round)).toBeFalsy()
     })
     it("is legal to play a draw card in the same color as the top card", () => {
       const shuffler = builder.hand(0).is({type: 'DRAW', color: 'BLUE'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeTruthy()
+      expect(canPlay(0, round)).toBeTruthy()
     })
     it("is not legal to play a draw card in a different color as the top card", () => {
       const shuffler = builder.hand(0).is({type: 'DRAW', color: 'RED'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeFalsy()
+      expect(canPlay(0, round)).toBeFalsy()
     })
     it("is legal to play a wild card on a numbered top card", () => {
       const shuffler = builder.hand(0).is({type: 'WILD'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeTruthy()
+      expect(canPlay(0, round)).toBeTruthy()
     })
   })
 
@@ -67,44 +67,44 @@ describe("Legal plays", () => {
       builder = shuffleBuilder().discard().is({type: 'REVERSE', color: 'BLUE'})
     })
     it("is legal to play a card in the same color as the top card", () => {
-      const shuffler = builder.hand(3).is({type: 'NUMBERED', color: 'BLUE'}).build()
+      const shuffler = builder.hand(2).is({type: 'NUMBERED', color: 'BLUE'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeTruthy()
+      expect(canPlay(0, round)).toBeTruthy()
     })
     it("is not legal to play a non-reverse card with different color than the top card", () => {
-      const shuffler = builder.hand(3).is({type: 'NUMBERED', color: 'RED'}).build()
+      const shuffler = builder.hand(2).is({type: 'NUMBERED', color: 'RED'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeFalsy()
+      expect(canPlay(0, round)).toBeFalsy()
     })
     it("is legal to play a reverse card", () => {
-      const shuffler = builder.hand(3).is({type: 'REVERSE', color: 'RED'}).build()
+      const shuffler = builder.hand(2).is({type: 'REVERSE', color: 'RED'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeTruthy()
+      expect(canPlay(0, round)).toBeTruthy()
     })
     it("is legal to play a skip card in the same color as the top card", () => {
-      const shuffler = builder.hand(3).is({type: 'SKIP', color: 'BLUE'}).build()
+      const shuffler = builder.hand(2).is({type: 'SKIP', color: 'BLUE'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeTruthy()
+      expect(canPlay(0, round)).toBeTruthy()
     })
     it("is not legal to play a skip card in a different color as the top card", () => {
-      const shuffler = builder.hand(3).is({type: 'SKIP', color: 'RED'}).build()
+      const shuffler = builder.hand(2).is({type: 'SKIP', color: 'RED'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeFalsy()
+      expect(canPlay(0, round)).toBeFalsy()
     })
     it("is legal to play a draw card in the same color as the top card", () => {
-      const shuffler = builder.hand(3).is({type: 'DRAW', color: 'BLUE'}).build()
+      const shuffler = builder.hand(2).is({type: 'DRAW', color: 'BLUE'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeTruthy()
+      expect(canPlay(0, round)).toBeTruthy()
     })
     it("is not legal to play a draw card in a different color as the top card", () => {
-      const shuffler = builder.hand(3).is({type: 'DRAW', color: 'RED'}).build()
+      const shuffler = builder.hand(2).is({type: 'DRAW', color: 'RED'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeFalsy()
+      expect(canPlay(0, round)).toBeFalsy()
     })
     it("is legal to play a wild card on a reverse top card", () => {
-      const shuffler = builder.hand(3).is({type: 'WILD'}).build()
+      const shuffler = builder.hand(2).is({type: 'WILD'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeTruthy()
+      expect(canPlay(0, round)).toBeTruthy()
     })
   })
 
@@ -116,42 +116,42 @@ describe("Legal plays", () => {
     it("is legal to play a card in the same color as the top card", () => {
       const shuffler = builder.hand(1).is({type: 'NUMBERED', color: 'BLUE'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeTruthy()
+      expect(canPlay(0, round)).toBeTruthy()
     })
     it("is not legal to play a non-skip card with different color than the top card", () => {
       const shuffler = builder.hand(1).is({type: 'NUMBERED', color: 'RED'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeFalsy()
+      expect(canPlay(0, round)).toBeFalsy()
     })
     it("is legal to play a skip card", () => {
       const shuffler = builder.hand(1).is({type: 'SKIP', color: 'RED'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeTruthy()
+      expect(canPlay(0, round)).toBeTruthy()
     })
     it("is legal to play a reverse card in the same color as the top card", () => {
       const shuffler = builder.hand(1).is({type: 'REVERSE', color: 'BLUE'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeTruthy()
+      expect(canPlay(0, round)).toBeTruthy()
     })
     it("is not legal to play a reverse card in a different color as the top card", () => {
       const shuffler = builder.hand(1).is({type: 'REVERSE', color: 'RED'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeFalsy()
+      expect(canPlay(0, round)).toBeFalsy()
     })
     it("is legal to play a draw card in the same color as the top card", () => {
       const shuffler = builder.hand(1).is({type: 'DRAW', color: 'BLUE'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeTruthy()
+      expect(canPlay(0, round)).toBeTruthy()
     })
     it("is not legal to play a draw card in a different color as the top card", () => {
       const shuffler = builder.hand(1).is({type: 'DRAW', color: 'RED'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeFalsy()
+      expect(canPlay(0, round)).toBeFalsy()
     })
     it("is legal to play a wild card on a skip top card", () => {
       const shuffler = builder.hand(1).is({type: 'WILD'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeTruthy()
+      expect(canPlay(0, round)).toBeTruthy()
     })
   })
 
@@ -163,54 +163,56 @@ describe("Legal plays", () => {
     it("is legal to play a card in the same color as the top card", () => {
       const shuffler = builder.hand(1).is({type: 'NUMBERED', color: 'BLUE'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeTruthy()
+      expect(canPlay(0, round)).toBeTruthy()
     })
     it("is not legal to play a non-skip card with different color than the top card", () => {
       const shuffler = builder.hand(1).is({type: 'NUMBERED', color: 'RED'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeFalsy()
+      expect(canPlay(0, round)).toBeFalsy()
     })
     it("is legal to play a draw card", () => {
       const shuffler = builder.hand(1).is({type: 'DRAW', color: 'RED'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeTruthy()
+      expect(canPlay(0, round)).toBeTruthy()
     })
     it("is legal to play a reverse card in the same color as the top card", () => {
       const shuffler = builder.hand(1).is({type: 'REVERSE', color: 'BLUE'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeTruthy()
+      expect(canPlay(0, round)).toBeTruthy()
     })
     it("is not legal to play a reverse card in a different color as the top card", () => {
       const shuffler = builder.hand(1).is({type: 'REVERSE', color: 'RED'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeFalsy()
+      expect(canPlay(0, round)).toBeFalsy()
     })
     it("is legal to play a skip card in the same color as the top card", () => {
       const shuffler = builder.hand(1).is({type: 'SKIP', color: 'BLUE'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeTruthy()
+      expect(canPlay(0, round)).toBeTruthy()
     })
     it("is not legal to play a skip card in a different color as the top card", () => {
       const shuffler = builder.hand(1).is({type: 'SKIP', color: 'RED'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeFalsy()
+      expect(canPlay(0, round)).toBeFalsy()
     })
     it("is legal to play a wild card on a skip top card", () => {
       const shuffler = builder.hand(1).is({type: 'WILD'}).build()
       const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeTruthy()
+      expect(canPlay(0, round)).toBeTruthy()
     })
   })
 
   describe("legal plays with a wild draw 4 card", () => {
-    it("can bluff by playing a wild draw 4 card with a matching color", () => {
+    it("can bluff with a wild draw 4 card if hand contains a card with matching color", () => {
       const shuffler = shuffleBuilder()
         .discard()
           .is({type: 'NUMBERED', color: 'GREEN'})
-        .hand(0).is({type: 'WILD DRAW'}, {color: 'GREEN'})
+        .hand(0
+
+        ).is({type: 'WILD DRAW'}, {color: 'GREEN'})
         .build()
       const round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeTruthy()
+      expect(canPlay(0, round)).toBeTruthy()
     })
     it("is legal to play a wild draw 4 card if hand doesn't contain another playable card", () => {
       const shuffler = shuffleBuilder()
@@ -226,7 +228,7 @@ describe("Legal plays", () => {
           .is({type: 'SKIP', color: 'YELLOW'})
         .build()
       const round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeTruthy()
+      expect(canPlay(0, round)).toBeTruthy()
     })
     it("is legal to play a wild draw 4 card even if hand contains a card with the right number", () => {
       const shuffler = shuffleBuilder()
@@ -238,7 +240,7 @@ describe("Legal plays", () => {
           .repeat(5).isnt({color: 'GREEN'})
         .build()
       const round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeTruthy()
+      expect(canPlay(0, round)).toBeTruthy()
     })
     it("is legal to play a wild draw 4 card even if hand contains a eligible draw card", () => {
       const shuffler = shuffleBuilder()
@@ -250,7 +252,7 @@ describe("Legal plays", () => {
           .repeat(5).isnt({color: 'GREEN'})
         .build()
       const round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeTruthy()
+      expect(canPlay(0, round)).toBeTruthy()
     })
     it("is legal to play a wild draw 4 card if hand contains a eligible skip card", () => {
       const shuffler = shuffleBuilder()
@@ -262,19 +264,19 @@ describe("Legal plays", () => {
           .repeat(5).isnt({color: 'GREEN'})
         .build()
       const round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeTruthy()
+      expect(canPlay(0, round)).toBeTruthy()
     })
     it("is legal to play a wild draw 4 card if hand contains a eligible reverse card", () => {
       const shuffler = shuffleBuilder()
         .discard()
           .is({type: 'REVERSE', color: 'GREEN'})
-        .hand(3)
+        .hand(2)
           .is({type: 'WILD DRAW'})
           .is({type: 'REVERSE', color: 'RED'})
           .repeat(5).isnt({color: 'GREEN'})
         .build()
       const round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeTruthy()
+      expect(canPlay(0, round)).toBeTruthy()
     })
     it("is legal to play a wild draw 4 card if hand contains a wild card", () => {
       const shuffler = shuffleBuilder()
@@ -286,7 +288,7 @@ describe("Legal plays", () => {
           .repeat(5).isnt({color: 'GREEN'})
         .build()
       const round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      expect(round.canPlay(0)).toBeTruthy()
+      expect(canPlay(0, round)).toBeTruthy()
     })
   })
 
@@ -301,21 +303,21 @@ describe("Legal plays", () => {
     })
     it("is legal to play a hand of the chosen color after a wild card", () => {
       const shuffler = builder.hand(1).is({color: 'BLUE'}).build()
-      const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      round.play(0, 'BLUE')
-      expect(round.canPlay(0)).toBeTruthy()
+      let round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
+      round = play(0, 'BLUE', round)
+      expect(canPlay(0, round)).toBeTruthy()
     })
     it("is illegal to play a hand of another color but the chosen after a wild card", () => {
       const shuffler = builder.hand(1).is({color: ['GREEN', 'RED', 'YELLOW']}).build()
-      const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      round.play(0, 'BLUE')
-      expect(round.canPlay(0)).toBeFalsy()
+      let round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
+      round = play(0, 'BLUE', round)
+      expect(canPlay(0, round)).toBeFalsy()
     })
     it("is legal to play a wild card after a wild card", () => {
       const shuffler = builder.hand(1).is({type: 'WILD'}).build()
-      const round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      round.play(0, 'BLUE')
-      expect(round.canPlay(0)).toBeTruthy()
+      let round: Round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
+      round = play(0, 'BLUE', round)
+      expect(canPlay(0, round)).toBeTruthy()
     })
     it("is legal to play a wild draw 4 card if hand doesn't contain the selected color", () => {
       const shuffler = builder
@@ -323,30 +325,30 @@ describe("Legal plays", () => {
           .is({type: 'WILD DRAW'})
           .repeat(6).isnt({color: 'GREEN'})
         .build()
-      const round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      round.play(0, 'GREEN')
-      expect(round.canPlay(0)).toBeTruthy()
+      let round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
+      round = play(0, 'GREEN', round)
+      expect(canPlay(0, round)).toBeTruthy()
     })
-    it("can bluff with a wild draw 4 card when the selected color is in hand", () => {
+    it("can bluff with a wild draw 4 card if hand contains the selected color", () => {
       const shuffler = builder
         .hand(1)
           .is({type: 'WILD DRAW'})
           .is({color: 'GREEN'})
         .build()
-      const round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
-      round.play(0, 'GREEN')
-      expect(round.canPlay(0)).toBeTruthy()
+      let round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3, shuffler})
+      round = play(0, 'GREEN', round)
+      expect(canPlay(0, round)).toBeTruthy()
     })
   })
 
   describe("boundary conditions", () => {
     it("is illegal to play a card with negative index", () => {
-      const hand = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3})
-      expect(hand.canPlay(-1)).toBeFalsy()
+      const round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3})
+      expect(canPlay(-1, round)).toBeFalsy()
     })
     it("is illegal to play a card with index beyond the maximum", () => {
-      const hand = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3})
-      expect(hand.canPlay(7)).toBeFalsy()
+      const round = createRound({players: ['a', 'b', 'c', 'd'], dealer: 3})
+      expect(canPlay(7, round)).toBeFalsy()
     })
   })
 })
